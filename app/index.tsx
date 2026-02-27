@@ -57,7 +57,7 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 
 // ─── Layout constants ───────────────────────────────────────────────────────
 
-const HERO_AUTO_MS = 4500;
+const HERO_AUTO_MS = 45_000;
 // CARD_H / GRID_GAP / GRID_H_PAD are computed inside the component
 // so they react to the actual window dimensions safely.
 
@@ -227,6 +227,10 @@ export default function LandingScreen() {
     isDesktop ? 720 : isTablet ? 680 : 540,
   );
 
+  // Hero slider width — inset by horizontal padding for visual breathing room
+  const HERO_H_PAD = 12;
+  const heroW = contentW - HERO_H_PAD * 2;
+
   // Card height — fixed pixel values, no verticalScale inflation
   const CARD_H = isDesktop ? 72 : isTablet ? 76 : 80;
 
@@ -308,14 +312,19 @@ export default function LandingScreen() {
     <SafeAreaView edges={["top", "bottom"]} style={styles.safe}>
       <View style={styles.page}>
         {/* ━━ Hero banner ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        <View style={[styles.heroContainer, { width: contentW }]}>
+        <View
+          style={[
+            styles.heroContainer,
+            { width: contentW, paddingHorizontal: HERO_H_PAD },
+          ]}
+        >
           <FlatList
             bounces={false}
             data={HERO_SLIDES}
             decelerationRate="fast"
             getItemLayout={(_, i) => ({
-              length: contentW,
-              offset: contentW * i,
+              length: heroW,
+              offset: heroW * i,
               index: i,
             })}
             horizontal
@@ -324,7 +333,7 @@ export default function LandingScreen() {
               const idx = Math.max(
                 0,
                 Math.min(
-                  Math.round(e.nativeEvent.contentOffset.x / contentW),
+                  Math.round(e.nativeEvent.contentOffset.x / heroW),
                   HERO_SLIDES.length - 1,
                 ),
               );
@@ -335,7 +344,7 @@ export default function LandingScreen() {
               setTimeout(
                 () =>
                   heroListRef.current?.scrollToOffset({
-                    offset: contentW * index,
+                    offset: heroW * index,
                     animated: true,
                   }),
                 100,
@@ -347,7 +356,7 @@ export default function LandingScreen() {
               <ImageBackground
                 imageStyle={styles.heroImgStyle}
                 source={{ uri: item.image }}
-                style={[styles.heroImg, { width: contentW, height: heroH }]}
+                style={[styles.heroImg, { width: heroW, height: heroH }]}
               >
                 <LinearGradient
                   colors={["rgba(5,10,30,0.05)", "rgba(5,10,30,0.80)"]}
@@ -509,7 +518,7 @@ const styles = StyleSheet.create({
   // ─── Root ────────────────────────────────────────────────────────────────
   safe: {
     flex: 1,
-    backgroundColor: "#EEF3FF",
+    backgroundColor: "#FFFFFF",
   },
   /** Single-page no-scroll container */
   page: {
@@ -528,13 +537,14 @@ const styles = StyleSheet.create({
   // ─── Hero banner ──────────────────────────────────────────────────────────
   heroContainer: {
     alignSelf: "center",
+    marginBottom: 10,
   },
   heroImg: {
-    borderRadius: 16,
+    borderRadius: 12,
     overflow: "hidden",
   },
   heroImgStyle: {
-    borderRadius: 16,
+    borderRadius: 12,
   },
   heroGrad: {
     flex: 1,
@@ -575,13 +585,13 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   heroDot: {
-    backgroundColor: "#B2C4F0",
+    backgroundColor: "#E5E7EB",
     borderRadius: 99,
     height: 6,
     width: 6,
   },
   heroDotActive: {
-    backgroundColor: "#2E57D4",
+    backgroundColor: "#3B82F6",
     width: 18,
   },
 
@@ -610,13 +620,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   sectionTitle: {
-    color: "#0C1A47",
+    color: "#111827",
     fontSize: 15,
-    fontWeight: "800",
+    fontWeight: "700",
     letterSpacing: 0.1,
   },
   sectionSub: {
-    color: "#5E6E9E",
+    color: "#6B7280",
     fontSize: 11,
     lineHeight: 16,
     marginTop: 2,
@@ -632,9 +642,9 @@ const styles = StyleSheet.create({
   },
   featureCard: {
     alignItems: "center",
-    backgroundColor: "#FAFBFF",
+    backgroundColor: "#F8FAFC",
     borderColor: "rgba(100,130,250,0.1)",
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1,
     flex: 1,
     justifyContent: "center",
@@ -658,7 +668,7 @@ const styles = StyleSheet.create({
     // height/width/borderRadius injected as inline style from card props
   },
   featureLabel: {
-    color: "#182048",
+    color: "#111827",
     fontSize: 10,
     fontWeight: "700",
     paddingHorizontal: 3,
@@ -678,7 +688,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   pageDot: {
-    backgroundColor: "#3155D8",
+    backgroundColor: "#3B82F6",
     borderRadius: 99,
     height: 6,
   },
@@ -688,9 +698,9 @@ const styles = StyleSheet.create({
     alignSelf: "center",
   },
   chipsTitle: {
-    color: "#0C1A47",
+    color: "#111827",
     fontSize: 13,
-    fontWeight: "800",
+    fontWeight: "700",
     marginBottom: 8,
   },
   chips: {
@@ -720,7 +730,7 @@ const styles = StyleSheet.create({
     }),
   },
   chipText: {
-    color: "#2B40A0",
+    color: "#3B82F6",
     fontSize: 11.5,
     fontWeight: "600",
   },

@@ -1,16 +1,30 @@
+import * as AuthSession from "expo-auth-session";
+import * as SecureStore from "expo-secure-store";
+import * as WebBrowser from "expo-web-browser";
 import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type PropsWithChildren,
 } from "react";
+import { Alert } from "react-native";
+
+WebBrowser.maybeCompleteAuthSession();
 
 type AuthUser = {
   id: string;
   email: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
+  profilePictureUrl?: string;
+  emailVerified?: boolean;
+  locale?: string;
+  authenticationMethod?: string;
+  createdAt?: string;
 };
 
 type AuthContextValue = {
@@ -21,28 +35,353 @@ type AuthContextValue = {
   logout: () => void;
 };
 
+type StoredAuthSession = {
+  user: AuthUser;
+  accessToken?: string;
+  refreshToken?: string;
+  authenticationMethod?: string;
+  organizationId?: string | null;
+  workosClientId?: string;
+  redirectUri?: string;
+  loggedInAt?: string;
+};
+
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+const AUTH_SESSION_STORAGE_KEY = "auth.session.v1";
+const DEFAULT_WORKOS_API_HOSTNAME = "api.workos.com";
+const DEFAULT_REDIRECT_SCHEME = "mobile";
+const DEFAULT_REDIRECT_PATH = "auth/callback";
+
+type WorkOSUserRaw = {
+  id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  profile_picture_url?: string | null;
+  email_verified?: boolean;
+  locale?: string | null;
+  created_at?: string;
+};
+
+type WorkOSAuthenticateResponseRaw = {
+  user: WorkOSUserRaw;
+  access_token: string;
+  refresh_token: string;
+  authentication_method: string;
+  organization_id?: string;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
+}
+
+function isAuthUser(value: unknown): value is AuthUser {
+  if (!isRecord(value)) return false;
+
+  return (
+    typeof value.id === "string" &&
+    typeof value.email === "string" &&
+    typeof value.name === "string"
+  );
+}
+
+function isWorkOSUserRaw(value: unknown): value is WorkOSUserRaw {
+  if (!isRecord(value)) return false;
+
+  return (
+    typeof value.id === "string" &&
+    typeof value.email === "string" &&
+    (typeof value.first_name === "string" || value.first_name === null) &&
+    (typeof value.last_name === "string" || value.last_name === null)
+  );
+}
+
+function parseStoredAuthSession(rawSession: string): StoredAuthSession | null {
+  try {
+    const parsed = JSON.parse(rawSession) as Record<string, unknown>;
+
+    if (!isAuthUser(parsed.user)) return null;
+
+    return {
+      user: parsed.user as AuthUser,
+      accessToken:
+        typeof parsed.accessToken === "string" ? parsed.accessToken : undefined,
+      refreshToken:
+        typeof parsed.refreshToken === "string"
+          ? parsed.refreshToken
+          : undefined,
+      authenticationMethod:
+        typeof parsed.authenticationMethod === "string"
+          ? parsed.authenticationMethod
+          : undefined,
+      organizationId:
+        typeof parsed.organizationId === "string" ||
+        parsed.organizationId === null
+          ? parsed.organizationId
+          : undefined,
+      workosClientId:
+        typeof parsed.workosClientId === "string"
+          ? parsed.workosClientId
+          : undefined,
+      redirectUri:
+        typeof parsed.redirectUri === "string" ? parsed.redirectUri : undefined,
+      loggedInAt:
+        typeof parsed.loggedInAt === "string" ? parsed.loggedInAt : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function normalizeHostname(hostname: string) {
+  return hostname.replace(/^https?:\/\//i, "").replace(/\/+$/g, "");
+}
+
+function getWorkOSBaseUrl() {
+  const hostname =
+    process.env.EXPO_PUBLIC_WORKOS_API_HOSTNAME?.trim() ||
+    DEFAULT_WORKOS_API_HOSTNAME;
+  return `https://${normalizeHostname(hostname)}`;
+}
+
+function getEnvString(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value ? value : undefined;
+}
+
+function isWorkOSAuthenticateResponseRaw(
+  value: unknown,
+): value is WorkOSAuthenticateResponseRaw {
+  if (!isRecord(value)) return false;
+
+  return (
+    isWorkOSUserRaw(value.user) &&
+    typeof value.access_token === "string" &&
+    typeof value.refresh_token === "string" &&
+    typeof value.authentication_method === "string" &&
+    (typeof value.organization_id === "string" ||
+      typeof value.organization_id === "undefined")
+  );
+}
+
+function toAuthUser(rawUser: WorkOSUserRaw, authMethod?: string): AuthUser {
+  const fullName =
+    `${rawUser.first_name ?? ""} ${rawUser.last_name ?? ""}`.trim();
+
+  return {
+    id: rawUser.id,
+    email: rawUser.email,
+    name: fullName || rawUser.email,
+    firstName: rawUser.first_name ?? undefined,
+    lastName: rawUser.last_name ?? undefined,
+    profilePictureUrl: rawUser.profile_picture_url ?? undefined,
+    emailVerified: rawUser.email_verified,
+    locale: rawUser.locale ?? undefined,
+    authenticationMethod: authMethod,
+    createdAt: rawUser.created_at,
+  };
+}
+
+async function authenticateWithCode({
+  baseUrl,
+  code,
+  codeVerifier,
+  workosClientId,
+}: {
+  baseUrl: string;
+  code: string;
+  codeVerifier: string;
+  workosClientId: string;
+}) {
+  const response = await fetch(`${baseUrl}/user_management/authenticate`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json, text/plain, */*",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      grant_type: "authorization_code",
+      code,
+      code_verifier: codeVerifier,
+      client_id: workosClientId,
+    }),
+  });
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    const errorDescription =
+      isRecord(payload) && typeof payload.error_description === "string"
+        ? payload.error_description
+        : "WorkOS did not accept the authorization code.";
+    throw new Error(errorDescription);
+  }
+
+  if (!isWorkOSAuthenticateResponseRaw(payload)) {
+    throw new Error("Unexpected WorkOS response payload.");
+  }
+
+  return payload;
+}
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isHydrating, setIsHydrating] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const hydrateAuthSession = async () => {
+      try {
+        const rawSession = await SecureStore.getItemAsync(
+          AUTH_SESSION_STORAGE_KEY,
+        );
+        if (!rawSession) return;
+
+        const parsedSession = parseStoredAuthSession(rawSession);
+        if (!parsedSession) {
+          await SecureStore.deleteItemAsync(AUTH_SESSION_STORAGE_KEY);
+          return;
+        }
+
+        if (isMounted) {
+          setUser(parsedSession.user);
+        }
+      } catch (error) {
+        console.warn("Failed to restore auth session from SecureStore", error);
+      } finally {
+        if (isMounted) {
+          setIsHydrating(false);
+        }
+      }
+    };
+
+    void hydrateAuthSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const startWorkOSLogin = useCallback(async () => {
     setIsLoading(true);
 
     try {
-      // TODO(workos-authkit):
-      // 1) Start WorkOS AuthKit authorization flow.
-      // 2) Handle browser redirect/callback in Expo.
-      // 3) Exchange code for session, then fetch user profile.
-      // 4) Replace the mock user below with real AuthKit user/session data.
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      const workosClientId = process.env.EXPO_PUBLIC_WORKOS_CLIENT_ID?.trim();
+      if (!workosClientId) {
+        Alert.alert(
+          "Missing WorkOS config",
+          "Set EXPO_PUBLIC_WORKOS_CLIENT_ID in your .env file.",
+        );
+        return;
+      }
 
-      setUser({
-        id: "demo-user-id",
-        email: "demo@superapp.app",
-        name: "Demo User",
+      const baseUrl = getWorkOSBaseUrl();
+      const redirectScheme =
+        process.env.EXPO_PUBLIC_WORKOS_REDIRECT_SCHEME?.trim() ||
+        DEFAULT_REDIRECT_SCHEME;
+      const redirectPath =
+        process.env.EXPO_PUBLIC_WORKOS_REDIRECT_PATH?.trim() ||
+        DEFAULT_REDIRECT_PATH;
+      const redirectUri = AuthSession.makeRedirectUri({
+        scheme: redirectScheme,
+        path: redirectPath,
       });
+      const organizationId = getEnvString("EXPO_PUBLIC_WORKOS_ORGANIZATION_ID");
+      const connectionId = getEnvString("EXPO_PUBLIC_WORKOS_CONNECTION_ID");
+      const domainHint = getEnvString("EXPO_PUBLIC_WORKOS_DOMAIN_HINT");
+      const loginHint = getEnvString("EXPO_PUBLIC_WORKOS_LOGIN_HINT");
+
+      const request = new AuthSession.AuthRequest({
+        clientId: workosClientId,
+        redirectUri,
+        responseType: AuthSession.ResponseType.Code,
+        usePKCE: true,
+        scopes: [],
+        extraParams: {
+          provider: "authkit",
+          screen_hint: "sign-in",
+          ...(organizationId && {
+            organization_id: organizationId,
+          }),
+          ...(connectionId && {
+            connection_id: connectionId,
+          }),
+          ...(domainHint && {
+            domain_hint: domainHint,
+          }),
+          ...(loginHint && {
+            login_hint: loginHint,
+          }),
+        },
+      });
+
+      const result = await request.promptAsync({
+        authorizationEndpoint: `${baseUrl}/user_management/authorize`,
+      });
+
+      if (result.type === "cancel" || result.type === "dismiss") {
+        return;
+      }
+
+      if (result.type !== "success") {
+        throw new Error("WorkOS login did not complete.");
+      }
+
+      const code = result.params.code;
+      const state = result.params.state;
+
+      if (!code) {
+        throw new Error("Missing authorization code from WorkOS callback.");
+      }
+
+      if (!request.codeVerifier) {
+        throw new Error("Missing PKCE code verifier.");
+      }
+
+      if (request.state && state !== request.state) {
+        throw new Error("State mismatch in WorkOS callback.");
+      }
+
+      const authResponse = await authenticateWithCode({
+        baseUrl,
+        code,
+        codeVerifier: request.codeVerifier,
+        workosClientId,
+      });
+      const nextUser = toAuthUser(
+        authResponse.user,
+        authResponse.authentication_method,
+      );
+
+      setUser(nextUser);
+
+      await SecureStore.setItemAsync(
+        AUTH_SESSION_STORAGE_KEY,
+        JSON.stringify({
+          user: nextUser,
+          accessToken: authResponse.access_token,
+          refreshToken: authResponse.refresh_token,
+          authenticationMethod: authResponse.authentication_method,
+          organizationId: authResponse.organization_id ?? null,
+          workosClientId,
+          redirectUri,
+          loggedInAt: new Date().toISOString(),
+        } satisfies StoredAuthSession),
+      );
+    } catch (error) {
+      console.warn("Failed to start WorkOS login", error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to start WorkOS login flow.";
+      Alert.alert("Login failed", message);
     } finally {
       setIsLoading(false);
     }
@@ -50,17 +389,18 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const logout = useCallback(() => {
     setUser(null);
+    void SecureStore.deleteItemAsync(AUTH_SESSION_STORAGE_KEY);
   }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       isAuthenticated: Boolean(user),
       user,
-      isLoading,
+      isLoading: isLoading || isHydrating,
       startWorkOSLogin,
       logout,
     }),
-    [isLoading, startWorkOSLogin, user, logout],
+    [isHydrating, isLoading, logout, startWorkOSLogin, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
