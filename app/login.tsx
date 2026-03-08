@@ -6,15 +6,15 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
+import { useHydratedWindowDimensions } from "@/hooks/use-hydrated-window-dimensions";
 
 export default function LoginScreen() {
-  const { width } = useWindowDimensions();
+  const { width } = useHydratedWindowDimensions();
   const insets = useSafeAreaInsets();
   const { isAuthenticated, isLoading, startWorkOSLogin } = useAuth();
   const horizontalPadding = width < 380 ? 12 : 16;

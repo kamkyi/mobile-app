@@ -14,7 +14,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -30,6 +29,7 @@ import {
 import { FEATURE_MAP } from "@/constants/pages";
 import { Brand, Radius, Spacing } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
+import { useHydratedWindowDimensions } from "@/hooks/use-hydrated-window-dimensions";
 
 type PriceFilter = {
   label: string;
@@ -200,7 +200,7 @@ function CarCard({ car }: { car: CarRentalItem }) {
 export default function FeatureScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ key?: string }>();
-  const { width } = useWindowDimensions();
+  const { width } = useHydratedWindowDimensions();
   const insets = useSafeAreaInsets();
   const { isAuthenticated } = useAuth();
 

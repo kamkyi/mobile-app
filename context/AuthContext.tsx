@@ -1,4 +1,5 @@
 import * as AuthSession from "expo-auth-session";
+import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
 import {
@@ -10,7 +11,7 @@ import {
   useState,
   type PropsWithChildren,
 } from "react";
-import { Alert } from "react-native";
+import { Alert, Platform } from "react-native";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -51,6 +52,50 @@ const AUTH_SESSION_STORAGE_KEY = "auth.session.v1";
 const DEFAULT_WORKOS_API_HOSTNAME = "api.workos.com";
 const DEFAULT_REDIRECT_SCHEME = "mobile";
 const DEFAULT_REDIRECT_PATH = "auth/callback";
+
+async function getStoredAuthSessionRaw(): Promise<string | null> {
+  if (Platform.OS === "web") {
+    if (typeof window === "undefined") return null;
+
+    try {
+      return window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  }
+
+  return SecureStore.getItemAsync(AUTH_SESSION_STORAGE_KEY);
+}
+
+async function setStoredAuthSessionRaw(value: string): Promise<void> {
+  if (Platform.OS === "web") {
+    if (typeof window === "undefined") return;
+
+    try {
+      window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, value);
+    } catch {
+      // Ignore storage write failures on web (private mode / quota restrictions).
+    }
+    return;
+  }
+
+  await SecureStore.setItemAsync(AUTH_SESSION_STORAGE_KEY, value);
+}
+
+async function clearStoredAuthSessionRaw(): Promise<void> {
+  if (Platform.OS === "web") {
+    if (typeof window === "undefined") return;
+
+    try {
+      window.localStorage.removeItem(AUTH_SESSION_STORAGE_KEY);
+    } catch {
+      // Ignore storage delete failures on web.
+    }
+    return;
+  }
+
+  await SecureStore.deleteItemAsync(AUTH_SESSION_STORAGE_KEY);
+}
 
 type WorkOSUserRaw = {
   id: string;
@@ -149,6 +194,20 @@ function getEnvString(name: string): string | undefined {
   return value ? value : undefined;
 }
 
+function getWebRedirectPath(path: string): string {
+  const normalizedPath = path.replace(/^\/+/, "");
+  const baseUrl = Constants.expoConfig?.experiments?.baseUrl;
+
+  if (typeof baseUrl !== "string") {
+    return normalizedPath;
+  }
+
+  const normalizedBase = baseUrl.trim().replace(/^\/+|\/+$/g, "");
+  return normalizedBase
+    ? `${normalizedBase}/${normalizedPath}`
+    : normalizedPath;
+}
+
 function isWorkOSAuthenticateResponseRaw(
   value: unknown,
 ): value is WorkOSAuthenticateResponseRaw {
@@ -239,14 +298,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     const hydrateAuthSession = async () => {
       try {
-        const rawSession = await SecureStore.getItemAsync(
-          AUTH_SESSION_STORAGE_KEY,
-        );
+        const rawSession = await getStoredAuthSessionRaw();
         if (!rawSession) return;
 
         const parsedSession = parseStoredAuthSession(rawSession);
         if (!parsedSession) {
-          await SecureStore.deleteItemAsync(AUTH_SESSION_STORAGE_KEY);
+          await clearStoredAuthSessionRaw();
           return;
         }
 
@@ -289,10 +346,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
       const redirectPath =
         process.env.EXPO_PUBLIC_WORKOS_REDIRECT_PATH?.trim() ||
         DEFAULT_REDIRECT_PATH;
-      const redirectUri = AuthSession.makeRedirectUri({
-        scheme: redirectScheme,
-        path: redirectPath,
-      });
+      const redirectUri = AuthSession.makeRedirectUri(
+        Platform.OS === "web"
+          ? { path: getWebRedirectPath(redirectPath) }
+          : {
+              scheme: redirectScheme,
+              path: redirectPath,
+            },
+      );
       const organizationId = getEnvString("EXPO_PUBLIC_WORKOS_ORGANIZATION_ID");
       const connectionId = getEnvString("EXPO_PUBLIC_WORKOS_CONNECTION_ID");
       const domainHint = getEnvString("EXPO_PUBLIC_WORKOS_DOMAIN_HINT");
@@ -362,8 +423,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
       setUser(nextUser);
 
-      await SecureStore.setItemAsync(
-        AUTH_SESSION_STORAGE_KEY,
+      await setStoredAuthSessionRaw(
         JSON.stringify({
           user: nextUser,
           accessToken: authResponse.access_token,
@@ -389,7 +449,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const logout = useCallback(() => {
     setUser(null);
-    void SecureStore.deleteItemAsync(AUTH_SESSION_STORAGE_KEY);
+    void clearStoredAuthSessionRaw();
   }, []);
 
   const value = useMemo<AuthContextValue>(

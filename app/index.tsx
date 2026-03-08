@@ -19,7 +19,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from "react-native";
 import Animated, {
@@ -35,6 +34,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { PAGES, type FeatureItem, type PopularChip } from "@/constants/pages";
 import { useAuth } from "@/context/AuthContext";
+import { useHydratedWindowDimensions } from "@/hooks/use-hydrated-window-dimensions";
 
 // ─── Responsive helpers ─────────────────────────────────────────────────────
 
@@ -199,7 +199,8 @@ function PageDot({
 }
 
 export default function LandingScreen() {
-  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } =
+    useHydratedWindowDimensions();
   const router = useRouter();
   const { isAuthenticated } = useAuth();
 
