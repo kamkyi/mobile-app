@@ -62,15 +62,17 @@ Current env keys:
 - `EXPO_PUBLIC_WORKOS_API_HOSTNAME` - WorkOS API host (`api.workos.com` default)
 - `EXPO_PUBLIC_WORKOS_REDIRECT_SCHEME` - App scheme for auth redirect (`mobile` by default)
 - `EXPO_PUBLIC_WORKOS_REDIRECT_PATH` - Callback path (`auth/callback` by default)
+- `EXPO_PUBLIC_WORKOS_WEB_REDIRECT_URI` - Optional full web callback URI override (recommended for GitHub Pages)
 - `EXPO_PUBLIC_WORKOS_ORGANIZATION_ID` - Optional organization hint
 - `EXPO_PUBLIC_WORKOS_CONNECTION_ID` - Optional connection hint
 - `EXPO_PUBLIC_WORKOS_DOMAIN_HINT` - Optional domain hint
 - `EXPO_PUBLIC_WORKOS_LOGIN_HINT` - Optional login email hint
 
-Register this redirect URI in WorkOS AuthKit:
+Register these redirect URIs in WorkOS AuthKit:
 
 ```txt
 mobile://auth/callback
+https://kamkyi.github.io/mobile-app/auth/callback
 ```
 
 ### Install Dependencies

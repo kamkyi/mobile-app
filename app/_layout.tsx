@@ -14,27 +14,16 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { DrawerProvider, useDrawer } from "@/context/DrawerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
-// ─── Dynamic Header Title ─────────────────────────────────────────────────────
-
-function HeaderTitle() {
-  const { user, isAuthenticated } = useAuth();
-  const displayName =
-    isAuthenticated && user?.firstName
-      ? `Hi, ${user.firstName} 👋`
-      : isAuthenticated && user?.name
-        ? `Hi, ${user.name.split(" ")[0]} 👋`
-        : "Super App";
-
+function HeaderBrand() {
   return (
-    <Text style={styles.headerTitle} numberOfLines={1}>
-      {displayName}
-    </Text>
+    <View style={styles.brandWrap}>
+      <View style={styles.brandDot} />
+      <Text style={styles.brandText}>Links</Text>
+    </View>
   );
 }
 
-// ─── Header Left: Avatar / Login ──────────────────────────────────────────────
-
-function HeaderMenuButton() {
+function HeaderActionButton() {
   const { isAuthenticated, user } = useAuth();
   const { open } = useDrawer();
   const router = useRouter();
@@ -45,12 +34,12 @@ function HeaderMenuButton() {
         onPress={() => router.push("/login")}
         style={({ pressed }) => [
           styles.headerButton,
-          pressed ? styles.headerButtonPressed : null,
+          pressed ? styles.buttonPressed : null,
         ]}
         accessibilityLabel="Log in"
         accessibilityRole="button"
       >
-        <Text style={styles.headerButtonText}>Login</Text>
+        <Text style={styles.loginButtonText}>Login</Text>
       </Pressable>
     );
   }
@@ -59,20 +48,23 @@ function HeaderMenuButton() {
     <Pressable
       onPress={open}
       hitSlop={10}
-      style={styles.avatarBtn}
+      style={({ pressed }) => [
+        styles.accountButton,
+        pressed && styles.buttonPressed,
+      ]}
       accessibilityLabel="Open menu"
       accessibilityRole="button"
     >
       {user?.profilePictureUrl ? (
         <Image
           source={{ uri: user.profilePictureUrl }}
-          style={styles.headerAvatar}
+          style={styles.avatarImage}
           contentFit="cover"
           transition={150}
         />
       ) : (
-        <View style={styles.headerAvatarFallback}>
-          <Text style={styles.headerAvatarInitials}>
+        <View style={styles.avatarFallback}>
+          <Text style={styles.avatarInitials}>
             {(user?.name ?? "U")
               .split(" ")
               .filter(Boolean)
@@ -82,6 +74,7 @@ function HeaderMenuButton() {
           </Text>
         </View>
       )}
+      <Text style={styles.accountText}>Menu</Text>
     </Pressable>
   );
 }
@@ -108,12 +101,18 @@ export default function RootLayout() {
             <Stack.Screen
               name="index"
               options={{
-                headerTitle: HeaderTitle,
-                headerLeft: HeaderMenuButton,
+                headerTitle: HeaderBrand,
+                headerTitleAlign: "left",
+                headerLeft: () => null,
+                headerRight: HeaderActionButton,
               }}
             />
             <Stack.Screen name="login" options={{ title: "Login" }} />
             <Stack.Screen name="feature/[key]" options={{ title: "Feature" }} />
+            <Stack.Screen
+              name="auth/callback"
+              options={{ headerShown: false }}
+            />
             <Stack.Screen
               name="modal"
               options={{ presentation: "modal", title: "Modal" }}
@@ -128,57 +127,86 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
-  headerTitle: {
-    fontSize: 17,
+  brandWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  brandDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#3B82F6",
+    borderWidth: 1,
+    borderColor: "#93C5FD",
+  },
+  brandText: {
+    fontSize: 18,
     fontWeight: "700",
     color: "#FFFFFF",
+    letterSpacing: 0.2,
   },
   headerButton: {
     borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.14)",
+    backgroundColor: "#3B82F6",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.32)",
-    minHeight: 34,
-    paddingHorizontal: 13,
-    paddingVertical: 7,
-    marginLeft: 4,
+    borderColor: "rgba(255,255,255,0.28)",
+    minHeight: 36,
+    minWidth: 84,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     alignItems: "center",
     justifyContent: "center",
   },
-  headerButtonPressed: {
+  buttonPressed: {
     opacity: 0.88,
     transform: [{ scale: 0.98 }],
   },
-  headerButtonText: {
+  loginButtonText: {
     color: "#FFFFFF",
-    fontSize: 13,
+    fontSize: 14,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+  },
+  accountButton: {
+    minHeight: 36,
+    borderRadius: 18,
+    paddingLeft: 4,
+    paddingRight: 10,
+    alignItems: "center",
+    flexDirection: "row",
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.32)",
+    gap: 7,
+  },
+  accountText: {
+    color: "#FFFFFF",
+    fontSize: 12.5,
     fontWeight: "700",
     letterSpacing: 0.2,
   },
-  avatarBtn: {
-    marginLeft: 8,
+  avatarImage: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.45)",
   },
-  headerAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    borderWidth: 2,
-    borderColor: "#3B82F6",
-  },
-  headerAvatarFallback: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "#0A2540",
+  avatarFallback: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#3B82F6",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#3B82F6",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.45)",
   },
-  headerAvatarInitials: {
+  avatarInitials: {
     color: "#fff",
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "700",
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
 });

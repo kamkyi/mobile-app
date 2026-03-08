@@ -89,7 +89,7 @@ const HERO_SLIDES: HeroSlide[] = [
   {
     key: "hero-3",
     title: "Daily Essentials,\nBeautifully Simple",
-    subtitle: "One super app for your complete city lifestyle.",
+    subtitle: "One Links app for your complete city lifestyle.",
     badge: "\u2728 SMART FLOW",
     image: "https://picsum.photos/id/1060/1200/600",
   },

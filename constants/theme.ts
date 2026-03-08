@@ -1,5 +1,5 @@
 /**
- * Design tokens for the Super App.
+ * Design tokens for the Links app.
  * All UI constants should be sourced from here to ensure consistency.
  */
 

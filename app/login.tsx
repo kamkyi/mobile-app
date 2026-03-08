@@ -45,7 +45,7 @@ export default function LoginScreen() {
       <View style={[styles.card, { width: cardWidth }]}>
         <Text style={styles.title}>Welcome back</Text>
         <Text style={styles.subtitle}>
-          Sign in to unlock all super app services.
+          Sign in to unlock all Links services.
         </Text>
 
         <Pressable

@@ -52,6 +52,7 @@ const AUTH_SESSION_STORAGE_KEY = "auth.session.v1";
 const DEFAULT_WORKOS_API_HOSTNAME = "api.workos.com";
 const DEFAULT_REDIRECT_SCHEME = "mobile";
 const DEFAULT_REDIRECT_PATH = "auth/callback";
+const DEFAULT_WEB_REDIRECT_PATH = "auth/callback";
 
 async function getStoredAuthSessionRaw(): Promise<string | null> {
   if (Platform.OS === "web") {
@@ -208,6 +209,17 @@ function getWebRedirectPath(path: string): string {
     : normalizedPath;
 }
 
+function getWebRedirectUri(path: string): string {
+  const configuredUri = process.env.EXPO_PUBLIC_WORKOS_WEB_REDIRECT_URI?.trim();
+  if (configuredUri) {
+    return configuredUri.replace(/\/+$/g, "");
+  }
+
+  return AuthSession.makeRedirectUri({
+    path: getWebRedirectPath(path || DEFAULT_WEB_REDIRECT_PATH),
+  });
+}
+
 function isWorkOSAuthenticateResponseRaw(
   value: unknown,
 ): value is WorkOSAuthenticateResponseRaw {
@@ -346,14 +358,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
       const redirectPath =
         process.env.EXPO_PUBLIC_WORKOS_REDIRECT_PATH?.trim() ||
         DEFAULT_REDIRECT_PATH;
-      const redirectUri = AuthSession.makeRedirectUri(
+      const redirectUri =
         Platform.OS === "web"
-          ? { path: getWebRedirectPath(redirectPath) }
-          : {
+          ? getWebRedirectUri(redirectPath)
+          : AuthSession.makeRedirectUri({
               scheme: redirectScheme,
               path: redirectPath,
-            },
-      );
+            });
       const organizationId = getEnvString("EXPO_PUBLIC_WORKOS_ORGANIZATION_ID");
       const connectionId = getEnvString("EXPO_PUBLIC_WORKOS_CONNECTION_ID");
       const domainHint = getEnvString("EXPO_PUBLIC_WORKOS_DOMAIN_HINT");
@@ -389,6 +400,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
       if (result.type === "cancel" || result.type === "dismiss") {
         return;
+      }
+
+      if (result.type === "error") {
+        const errorDescription =
+          isRecord(result.params) &&
+          typeof result.params.error_description === "string"
+            ? result.params.error_description
+            : "WorkOS login did not complete.";
+        throw new Error(errorDescription);
       }
 
       if (result.type !== "success") {

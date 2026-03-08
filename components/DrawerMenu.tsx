@@ -497,7 +497,7 @@ export default function DrawerMenu() {
           </Pressable>
 
           <Text style={[styles.footerVersion, { color: palette.subtext }]}>
-            Super App · v1.0.0
+            Links · v1.0.0
           </Text>
         </View>
       </Animated.View>
