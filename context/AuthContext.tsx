@@ -1,9 +1,10 @@
 import * as AuthSession from "expo-auth-session";
-import Constants from "expo-constants";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
 import {
   createContext,
+  useRef,
   useCallback,
   useContext,
   useEffect,
@@ -33,6 +34,9 @@ type AuthContextValue = {
   user: AuthUser | null;
   isLoading: boolean;
   startWorkOSLogin: () => Promise<void>;
+  finishWorkOSLoginFromCallback: (
+    params: WorkOSCallbackParams,
+  ) => Promise<void>;
   logout: () => void;
 };
 
@@ -47,55 +51,99 @@ type StoredAuthSession = {
   loggedInAt?: string;
 };
 
+type PendingWorkOSLogin = {
+  baseUrl: string;
+  codeVerifier: string;
+  redirectUri: string;
+  state: string;
+  workosClientId: string;
+  startedAt?: string;
+};
+
+type WorkOSCallbackParams = {
+  code?: string;
+  state?: string;
+  error?: string;
+  errorDescription?: string;
+};
+
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 const AUTH_SESSION_STORAGE_KEY = "auth.session.v1";
+const PENDING_WORKOS_LOGIN_STORAGE_KEY = "auth.pending.workos.v1";
 const DEFAULT_WORKOS_API_HOSTNAME = "api.workos.com";
 const DEFAULT_REDIRECT_SCHEME = "mobile";
 const DEFAULT_REDIRECT_PATH = "auth/callback";
 const DEFAULT_WEB_REDIRECT_PATH = "auth/callback";
 
-async function getStoredAuthSessionRaw(): Promise<string | null> {
+async function getStoredValueRaw(storageKey: string): Promise<string | null> {
   if (Platform.OS === "web") {
     if (typeof window === "undefined") return null;
 
     try {
-      return window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY);
+      return window.localStorage.getItem(storageKey);
     } catch {
       return null;
     }
   }
 
-  return SecureStore.getItemAsync(AUTH_SESSION_STORAGE_KEY);
+  return SecureStore.getItemAsync(storageKey);
 }
 
-async function setStoredAuthSessionRaw(value: string): Promise<void> {
+async function setStoredValueRaw(
+  storageKey: string,
+  value: string,
+): Promise<void> {
   if (Platform.OS === "web") {
     if (typeof window === "undefined") return;
 
     try {
-      window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, value);
+      window.localStorage.setItem(storageKey, value);
     } catch {
       // Ignore storage write failures on web (private mode / quota restrictions).
     }
     return;
   }
 
-  await SecureStore.setItemAsync(AUTH_SESSION_STORAGE_KEY, value);
+  await SecureStore.setItemAsync(storageKey, value);
 }
 
-async function clearStoredAuthSessionRaw(): Promise<void> {
+async function clearStoredValueRaw(storageKey: string): Promise<void> {
   if (Platform.OS === "web") {
     if (typeof window === "undefined") return;
 
     try {
-      window.localStorage.removeItem(AUTH_SESSION_STORAGE_KEY);
+      window.localStorage.removeItem(storageKey);
     } catch {
       // Ignore storage delete failures on web.
     }
     return;
   }
 
-  await SecureStore.deleteItemAsync(AUTH_SESSION_STORAGE_KEY);
+  await SecureStore.deleteItemAsync(storageKey);
+}
+
+async function getStoredAuthSessionRaw(): Promise<string | null> {
+  return getStoredValueRaw(AUTH_SESSION_STORAGE_KEY);
+}
+
+async function setStoredAuthSessionRaw(value: string): Promise<void> {
+  await setStoredValueRaw(AUTH_SESSION_STORAGE_KEY, value);
+}
+
+async function clearStoredAuthSessionRaw(): Promise<void> {
+  await clearStoredValueRaw(AUTH_SESSION_STORAGE_KEY);
+}
+
+async function getStoredPendingWorkOSLoginRaw(): Promise<string | null> {
+  return getStoredValueRaw(PENDING_WORKOS_LOGIN_STORAGE_KEY);
+}
+
+async function setStoredPendingWorkOSLoginRaw(value: string): Promise<void> {
+  await setStoredValueRaw(PENDING_WORKOS_LOGIN_STORAGE_KEY, value);
+}
+
+async function clearStoredPendingWorkOSLoginRaw(): Promise<void> {
+  await clearStoredValueRaw(PENDING_WORKOS_LOGIN_STORAGE_KEY);
 }
 
 type WorkOSUserRaw = {
@@ -179,6 +227,36 @@ function parseStoredAuthSession(rawSession: string): StoredAuthSession | null {
   }
 }
 
+function parsePendingWorkOSLogin(
+  rawPendingLogin: string,
+): PendingWorkOSLogin | null {
+  try {
+    const parsed = JSON.parse(rawPendingLogin) as Record<string, unknown>;
+
+    if (
+      typeof parsed.baseUrl !== "string" ||
+      typeof parsed.codeVerifier !== "string" ||
+      typeof parsed.redirectUri !== "string" ||
+      typeof parsed.state !== "string" ||
+      typeof parsed.workosClientId !== "string"
+    ) {
+      return null;
+    }
+
+    return {
+      baseUrl: parsed.baseUrl,
+      codeVerifier: parsed.codeVerifier,
+      redirectUri: parsed.redirectUri,
+      state: parsed.state,
+      workosClientId: parsed.workosClientId,
+      startedAt:
+        typeof parsed.startedAt === "string" ? parsed.startedAt : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function normalizeHostname(hostname: string) {
   return hostname.replace(/^https?:\/\//i, "").replace(/\/+$/g, "");
 }
@@ -217,6 +295,28 @@ function getWebRedirectUri(path: string): string {
 
   return AuthSession.makeRedirectUri({
     path: getWebRedirectPath(path || DEFAULT_WEB_REDIRECT_PATH),
+  });
+}
+
+function getNativeRedirectUri(path: string): string {
+  const configuredUri = process.env.EXPO_PUBLIC_WORKOS_REDIRECT_URI?.trim();
+  if (configuredUri) {
+    return configuredUri.replace(/\/+$/g, "");
+  }
+
+  if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
+    return AuthSession.makeRedirectUri({
+      path,
+    });
+  }
+
+  const redirectScheme =
+    process.env.EXPO_PUBLIC_WORKOS_REDIRECT_SCHEME?.trim() ||
+    DEFAULT_REDIRECT_SCHEME;
+
+  return AuthSession.makeRedirectUri({
+    scheme: redirectScheme,
+    path,
   });
 }
 
@@ -304,6 +404,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isHydrating, setIsHydrating] = useState(true);
+  const pendingCompletionRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -338,6 +439,104 @@ export function AuthProvider({ children }: PropsWithChildren) {
     };
   }, []);
 
+  const finishWorkOSLoginFromCallback = useCallback(
+    async ({
+      code,
+      state,
+      error,
+      errorDescription,
+    }: WorkOSCallbackParams) => {
+      if (pendingCompletionRef.current) {
+        return pendingCompletionRef.current;
+      }
+
+      const completion = (async () => {
+        setIsLoading(true);
+
+        try {
+          const rawPendingLogin = await getStoredPendingWorkOSLoginRaw();
+          const pendingLogin = rawPendingLogin
+            ? parsePendingWorkOSLogin(rawPendingLogin)
+            : null;
+
+          if (!pendingLogin) {
+            await clearStoredPendingWorkOSLoginRaw();
+
+            if (error) {
+              throw new Error(errorDescription || "WorkOS login was denied.");
+            }
+
+            if (code) {
+              throw new Error(
+                "No pending WorkOS login was found. Start the login flow again.",
+              );
+            }
+
+            return;
+          }
+
+          if (error) {
+            throw new Error(errorDescription || "WorkOS login was denied.");
+          }
+
+          if (!code) {
+            throw new Error("Missing authorization code from WorkOS callback.");
+          }
+
+          if (!state) {
+            throw new Error("Missing state from WorkOS callback.");
+          }
+
+          if (state !== pendingLogin.state) {
+            throw new Error("State mismatch in WorkOS callback.");
+          }
+
+          const authResponse = await authenticateWithCode({
+            baseUrl: pendingLogin.baseUrl,
+            code,
+            codeVerifier: pendingLogin.codeVerifier,
+            workosClientId: pendingLogin.workosClientId,
+          });
+          const nextUser = toAuthUser(
+            authResponse.user,
+            authResponse.authentication_method,
+          );
+
+          setUser(nextUser);
+
+          await setStoredAuthSessionRaw(
+            JSON.stringify({
+              user: nextUser,
+              accessToken: authResponse.access_token,
+              refreshToken: authResponse.refresh_token,
+              authenticationMethod: authResponse.authentication_method,
+              organizationId: authResponse.organization_id ?? null,
+              workosClientId: pendingLogin.workosClientId,
+              redirectUri: pendingLogin.redirectUri,
+              loggedInAt: new Date().toISOString(),
+            } satisfies StoredAuthSession),
+          );
+
+          await clearStoredPendingWorkOSLoginRaw();
+        } catch (completionError) {
+          await clearStoredPendingWorkOSLoginRaw();
+          throw completionError;
+        } finally {
+          setIsLoading(false);
+        }
+      })();
+
+      pendingCompletionRef.current = completion;
+
+      try {
+        await completion;
+      } finally {
+        pendingCompletionRef.current = null;
+      }
+    },
+    [],
+  );
+
   const startWorkOSLogin = useCallback(async () => {
     setIsLoading(true);
 
@@ -352,23 +551,36 @@ export function AuthProvider({ children }: PropsWithChildren) {
       }
 
       const baseUrl = getWorkOSBaseUrl();
-      const redirectScheme =
-        process.env.EXPO_PUBLIC_WORKOS_REDIRECT_SCHEME?.trim() ||
-        DEFAULT_REDIRECT_SCHEME;
       const redirectPath =
         process.env.EXPO_PUBLIC_WORKOS_REDIRECT_PATH?.trim() ||
         DEFAULT_REDIRECT_PATH;
       const redirectUri =
         Platform.OS === "web"
           ? getWebRedirectUri(redirectPath)
-          : AuthSession.makeRedirectUri({
-              scheme: redirectScheme,
-              path: redirectPath,
-            });
+          : getNativeRedirectUri(redirectPath);
+      const isExpoGoNativeRuntime =
+        Platform.OS !== "web" &&
+        Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
       const organizationId = getEnvString("EXPO_PUBLIC_WORKOS_ORGANIZATION_ID");
       const connectionId = getEnvString("EXPO_PUBLIC_WORKOS_CONNECTION_ID");
       const domainHint = getEnvString("EXPO_PUBLIC_WORKOS_DOMAIN_HINT");
       const loginHint = getEnvString("EXPO_PUBLIC_WORKOS_LOGIN_HINT");
+      const discovery = {
+        authorizationEndpoint: `${baseUrl}/user_management/authorize`,
+      };
+
+      console.info("Starting WorkOS login", {
+        executionEnvironment: Constants.executionEnvironment,
+        platform: Platform.OS,
+        redirectUri,
+      });
+
+      if (isExpoGoNativeRuntime) {
+        console.warn(
+          "WorkOS login is running inside Expo Go. Register this exact redirect URI in WorkOS or switch to a development build:",
+          redirectUri,
+        );
+      }
 
       const request = new AuthSession.AuthRequest({
         clientId: workosClientId,
@@ -394,67 +606,71 @@ export function AuthProvider({ children }: PropsWithChildren) {
         },
       });
 
-      const result = await request.promptAsync({
-        authorizationEndpoint: `${baseUrl}/user_management/authorize`,
-      });
+      await request.makeAuthUrlAsync(discovery);
+
+      if (!request.codeVerifier || !request.state) {
+        throw new Error("Failed to prepare the WorkOS PKCE request.");
+      }
+
+      await setStoredPendingWorkOSLoginRaw(
+        JSON.stringify({
+          baseUrl,
+          codeVerifier: request.codeVerifier,
+          redirectUri,
+          state: request.state,
+          workosClientId,
+          startedAt: new Date().toISOString(),
+        } satisfies PendingWorkOSLogin),
+      );
+
+      const result = await request.promptAsync(discovery);
 
       if (result.type === "cancel" || result.type === "dismiss") {
+        await clearStoredPendingWorkOSLoginRaw();
         return;
       }
 
       if (result.type === "error") {
-        const errorDescription =
-          isRecord(result.params) &&
-          typeof result.params.error_description === "string"
-            ? result.params.error_description
-            : "WorkOS login did not complete.";
-        throw new Error(errorDescription);
+        await finishWorkOSLoginFromCallback({
+          error:
+            typeof result.params.error === "string"
+              ? result.params.error
+              : result.error?.code,
+          errorDescription:
+            result.error?.description ||
+            (isRecord(result.params) &&
+            typeof result.params.error_description === "string"
+              ? result.params.error_description
+              : "WorkOS login did not complete."),
+          state:
+            typeof result.params.state === "string"
+              ? result.params.state
+              : undefined,
+        });
+        return;
       }
 
       if (result.type !== "success") {
+        await clearStoredPendingWorkOSLoginRaw();
         throw new Error("WorkOS login did not complete.");
       }
 
-      const code = result.params.code;
-      const state = result.params.state;
-
-      if (!code) {
-        throw new Error("Missing authorization code from WorkOS callback.");
-      }
-
-      if (!request.codeVerifier) {
-        throw new Error("Missing PKCE code verifier.");
-      }
-
-      if (request.state && state !== request.state) {
-        throw new Error("State mismatch in WorkOS callback.");
-      }
-
-      const authResponse = await authenticateWithCode({
-        baseUrl,
-        code,
-        codeVerifier: request.codeVerifier,
-        workosClientId,
+      await finishWorkOSLoginFromCallback({
+        code:
+          typeof result.params.code === "string" ? result.params.code : undefined,
+        state:
+          typeof result.params.state === "string"
+            ? result.params.state
+            : undefined,
+        error:
+          typeof result.params.error === "string"
+            ? result.params.error
+            : undefined,
+        errorDescription:
+          typeof result.params.error_description === "string"
+            ? result.params.error_description
+            : undefined,
       });
-      const nextUser = toAuthUser(
-        authResponse.user,
-        authResponse.authentication_method,
-      );
-
-      setUser(nextUser);
-
-      await setStoredAuthSessionRaw(
-        JSON.stringify({
-          user: nextUser,
-          accessToken: authResponse.access_token,
-          refreshToken: authResponse.refresh_token,
-          authenticationMethod: authResponse.authentication_method,
-          organizationId: authResponse.organization_id ?? null,
-          workosClientId,
-          redirectUri,
-          loggedInAt: new Date().toISOString(),
-        } satisfies StoredAuthSession),
-      );
     } catch (error) {
       console.warn("Failed to start WorkOS login", error);
       const message =
@@ -470,6 +686,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const logout = useCallback(() => {
     setUser(null);
     void clearStoredAuthSessionRaw();
+    void clearStoredPendingWorkOSLoginRaw();
   }, []);
 
   const value = useMemo<AuthContextValue>(
@@ -478,9 +695,17 @@ export function AuthProvider({ children }: PropsWithChildren) {
       user,
       isLoading: isLoading || isHydrating,
       startWorkOSLogin,
+      finishWorkOSLoginFromCallback,
       logout,
     }),
-    [isHydrating, isLoading, logout, startWorkOSLogin, user],
+    [
+      finishWorkOSLoginFromCallback,
+      isHydrating,
+      isLoading,
+      logout,
+      startWorkOSLogin,
+      user,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

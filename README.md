@@ -60,6 +60,7 @@ Current env keys:
 
 - `EXPO_PUBLIC_WORKOS_CLIENT_ID` - WorkOS AuthKit public client id (safe for mobile/public client use)
 - `EXPO_PUBLIC_WORKOS_API_HOSTNAME` - WorkOS API host (`api.workos.com` default)
+- `EXPO_PUBLIC_WORKOS_REDIRECT_URI` - Optional full native callback URI override when you need an exact mobile redirect
 - `EXPO_PUBLIC_WORKOS_REDIRECT_SCHEME` - App scheme for auth redirect (`mobile` by default)
 - `EXPO_PUBLIC_WORKOS_REDIRECT_PATH` - Callback path (`auth/callback` by default)
 - `EXPO_PUBLIC_WORKOS_WEB_REDIRECT_URI` - Optional full web callback URI override (recommended for GitHub Pages)
@@ -94,6 +95,8 @@ From the terminal output you can open the app in:
 - **Android Emulator** - press `a`
 - **Web browser** - press `w`
 
+For WorkOS/AuthKit on native, use a Development Build or production build. Expo's auth docs note that OAuth/OpenID redirect flows do not work reliably in Expo Go because the app scheme cannot be customized there.
+
 ## WorkOS Security Model (No Backend Yet)
 
 - Mobile app should use only **public** config (`client_id`).
@@ -104,6 +107,7 @@ From the terminal output you can open the app in:
 ## Current Auth Integration
 
 - `context/AuthContext.tsx` uses AuthKit PKCE with `expo-auth-session`.
+- Pending mobile auth state is persisted so the WorkOS callback can finish after the deep-link return.
 - Login state is persisted in `expo-secure-store`.
 - Authorization request: `https://api.workos.com/user_management/authorize`
 - Code exchange request: `https://api.workos.com/user_management/authenticate`

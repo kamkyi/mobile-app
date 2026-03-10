@@ -1,8 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import { LinearGradient } from "expo-linear-gradient";
 import { Redirect } from "expo-router";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -17,6 +19,9 @@ export default function LoginScreen() {
   const { width } = useHydratedWindowDimensions();
   const insets = useSafeAreaInsets();
   const { isAuthenticated, isLoading, startWorkOSLogin } = useAuth();
+  const isExpoGoNativeRuntime =
+    Platform.OS !== "web" &&
+    Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
   const horizontalPadding = width < 380 ? 12 : 16;
   const cardWidth = Math.min(width - horizontalPadding * 2, 380);
 
@@ -77,8 +82,9 @@ export default function LoginScreen() {
         </Pressable>
 
         <Text style={styles.note}>
-          Uses WorkOS AuthKit PKCE flow. Ensure your WorkOS app includes this
-          mobile redirect URI and your EXPO_PUBLIC_WORKOS_CLIENT_ID is set.
+          {isExpoGoNativeRuntime
+            ? "Expo Go uses a temporary exp:// callback. Register the exact redirect URI printed in the Metro logs or use a development build for WorkOS login."
+            : "Uses WorkOS AuthKit PKCE flow. Ensure your WorkOS app includes this mobile redirect URI and your EXPO_PUBLIC_WORKOS_CLIENT_ID is set."}
         </Text>
       </View>
     </View>
