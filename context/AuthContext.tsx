@@ -370,6 +370,14 @@ function toAuthUser(rawUser: WorkOSUserRaw, authMethod?: string): AuthUser {
   };
 }
 
+function getCurrentWebOrigin(): string | undefined {
+  if (Platform.OS !== "web" || typeof window === "undefined") {
+    return undefined;
+  }
+
+  return window.location.origin;
+}
+
 async function authenticateWithCode({
   baseUrl,
   code,
@@ -381,19 +389,32 @@ async function authenticateWithCode({
   codeVerifier: string;
   workosClientId: string;
 }) {
-  const response = await fetch(`${baseUrl}/user_management/authenticate`, {
-    method: "POST",
-    headers: {
-      Accept: "application/json, text/plain, */*",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      grant_type: "authorization_code",
-      code,
-      code_verifier: codeVerifier,
-      client_id: workosClientId,
-    }),
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${baseUrl}/user_management/authenticate`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json, text/plain, */*",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        grant_type: "authorization_code",
+        code,
+        code_verifier: codeVerifier,
+        client_id: workosClientId,
+      }),
+    });
+  } catch (error) {
+    if (Platform.OS === "web") {
+      const origin = getCurrentWebOrigin() ?? "this web origin";
+      throw new Error(
+        `WorkOS code exchange failed from ${origin}. Add this exact origin in WorkOS Dashboard -> Authentication -> Configure CORS, then redeploy.`,
+      );
+    }
+
+    throw error;
+  }
 
   let payload: unknown;
   try {
@@ -599,7 +620,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
       if (configuredRedirectPath !== redirectPath) {
         console.warn(
-          "EXPO_PUBLIC_WORKOS_REDIRECT_PATH must be a path like auth/callback. Using a safe fallback path and treating the configured absolute URL as the web redirect URI.",
+          "EXPO_PUBLIC_WORKOS_REDIRECT_PATH should be a path like auth/callback. For GitHub Pages, put the full URL in EXPO_PUBLIC_WORKOS_WEB_REDIRECT_URI and keep EXPO_PUBLIC_WORKOS_REDIRECT_PATH=auth/callback. Using fallback behavior now.",
           configuredRedirectPath,
         );
       }

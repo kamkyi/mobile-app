@@ -10,6 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useTranslation } from "react-i18next";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
@@ -19,6 +20,7 @@ export default function LoginScreen() {
   const { width } = useHydratedWindowDimensions();
   const insets = useSafeAreaInsets();
   const { isAuthenticated, isLoading, startWorkOSLogin } = useAuth();
+  const { t } = useTranslation();
   const isExpoGoNativeRuntime =
     Platform.OS !== "web" &&
     Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
@@ -48,14 +50,12 @@ export default function LoginScreen() {
       />
 
       <View style={[styles.card, { width: cardWidth }]}>
-        <Text style={styles.title}>Welcome back</Text>
-        <Text style={styles.subtitle}>
-          Sign in to unlock all Links services.
-        </Text>
+        <Text style={styles.title}>{t("login.title")}</Text>
+        <Text style={styles.subtitle}>{t("login.subtitle")}</Text>
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Continue with WorkOS"
+          accessibilityLabel={t("login.continueWithWorkOS")}
           disabled={isLoading}
           onPress={startWorkOSLogin}
           style={({ pressed }) => [
@@ -75,7 +75,9 @@ export default function LoginScreen() {
             ) : (
               <View style={styles.loginButtonRow}>
                 <Ionicons color="#FFFFFF" name="log-in-outline" size={18} />
-                <Text style={styles.loginButtonText}>Continue with WorkOS</Text>
+                <Text style={styles.loginButtonText}>
+                  {t("login.continueWithWorkOS")}
+                </Text>
               </View>
             )}
           </LinearGradient>
@@ -83,8 +85,8 @@ export default function LoginScreen() {
 
         <Text style={styles.note}>
           {isExpoGoNativeRuntime
-            ? "Expo Go uses a temporary exp:// callback. Register the exact redirect URI printed in the Metro logs or use a development build for WorkOS login."
-            : "Uses WorkOS AuthKit PKCE flow. Ensure your WorkOS app includes this mobile redirect URI and your EXPO_PUBLIC_WORKOS_CLIENT_ID is set."}
+            ? t("login.noteExpoGo")
+            : t("login.noteDefault")}
         </Text>
       </View>
     </View>

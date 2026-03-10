@@ -16,6 +16,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useTranslation } from "react-i18next";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -32,15 +33,15 @@ import { useAuth } from "@/context/AuthContext";
 import { useHydratedWindowDimensions } from "@/hooks/use-hydrated-window-dimensions";
 
 type PriceFilter = {
-  label: string;
+  key: "any" | "upTo1200" | "upTo1800" | "upTo2500";
   value: number | null;
 };
 
 const PRICE_FILTERS: PriceFilter[] = [
-  { label: "Any price", value: null },
-  { label: "Up to THB 1,200", value: 1200 },
-  { label: "Up to THB 1,800", value: 1800 },
-  { label: "Up to THB 2,500", value: 2500 },
+  { key: "any", value: null },
+  { key: "upTo1200", value: 1200 },
+  { key: "upTo1800", value: 1800 },
+  { key: "upTo2500", value: 2500 },
 ];
 
 const ALL_LOCATIONS = "All Thailand";
@@ -116,6 +117,8 @@ function FilterChip({
 }
 
 function CarCard({ car }: { car: CarRentalItem }) {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.carCard}>
       <View style={styles.carBanner}>
@@ -142,7 +145,8 @@ function CarCard({ car }: { car: CarRentalItem }) {
           <View style={styles.carHeaderTextWrap}>
             <Text style={styles.carName}>{car.name}</Text>
             <Text style={styles.carMeta}>
-              {car.brand} · {car.transmission} · {car.seats} seats
+              {car.brand} · {car.transmission} ·{" "}
+              {t("feature.carRental.seats", { count: car.seats })}
             </Text>
           </View>
           <View style={styles.ratingPill}>
@@ -158,7 +162,9 @@ function CarCard({ car }: { car: CarRentalItem }) {
           </View>
           <View style={styles.specTag}>
             <Ionicons color={Brand.accent} name="car-outline" size={12} />
-            <Text style={styles.specTagText}>{car.trips} trips</Text>
+            <Text style={styles.specTagText}>
+              {t("feature.carRental.trips", { count: car.trips })}
+            </Text>
           </View>
         </View>
 
@@ -169,7 +175,10 @@ function CarCard({ car }: { car: CarRentalItem }) {
             size={13}
           />
           <Text style={styles.availabilityText}>
-            {car.availableFrom} to {car.availableTo}
+            {t("feature.carRental.availableRange", {
+              from: car.availableFrom,
+              to: car.availableTo,
+            })}
           </Text>
         </View>
 
@@ -178,18 +187,20 @@ function CarCard({ car }: { car: CarRentalItem }) {
             <Text style={styles.priceText}>
               {formatTHB(car.pricePerDayTHB)}
             </Text>
-            <Text style={styles.perDayText}>per day</Text>
+            <Text style={styles.perDayText}>{t("feature.carRental.perDay")}</Text>
           </View>
 
           <Pressable
-            accessibilityLabel={`Book ${car.name}`}
+            accessibilityLabel={t("feature.carRental.bookCarA11y", {
+              name: car.name,
+            })}
             accessibilityRole="button"
             style={({ pressed }) => [
               styles.bookButton,
               pressed ? styles.bookButtonPressed : null,
             ]}
           >
-            <Text style={styles.bookButtonText}>Book now</Text>
+            <Text style={styles.bookButtonText}>{t("feature.carRental.bookNow")}</Text>
           </Pressable>
         </View>
       </View>
@@ -203,6 +214,7 @@ export default function FeatureScreen() {
   const { width } = useHydratedWindowDimensions();
   const insets = useSafeAreaInsets();
   const { isAuthenticated } = useAuth();
+  const { t } = useTranslation();
 
   const horizontalPadding = width < 380 ? 12 : 16;
   const contentWidth = Math.min(width - horizontalPadding * 2, 760);
@@ -235,6 +247,11 @@ export default function FeatureScreen() {
   const isCarRental = params.key === "car-rental";
   const shouldRedirectToLogin =
     hasMounted && Boolean(feature?.requiresAuth) && !isAuthenticated;
+  const featureTitle = params.key
+    ? t(`features.items.${params.key}`, {
+        defaultValue: feature?.label ?? t("feature.defaultTitle"),
+      })
+    : t("feature.defaultTitle");
 
   const filteredCars = useMemo(() => {
     if (!isCarRental) {
@@ -298,7 +315,7 @@ export default function FeatureScreen() {
           },
         ]}
       >
-        <Stack.Screen options={{ title: "Car Rental" }} />
+        <Stack.Screen options={{ title: t("features.items.car-rental") }} />
 
         <LinearGradient
           colors={["#EAF1FF", "#F7FAFF"]}
@@ -325,35 +342,42 @@ export default function FeatureScreen() {
                     name="car-sport-outline"
                     size={12}
                   />
-                  <Text style={styles.heroTagText}>Thailand fleet</Text>
+                  <Text style={styles.heroTagText}>
+                    {t("feature.carRental.heroTag")}
+                  </Text>
                 </View>
-                <Text style={styles.heroCount}>{filteredCars.length} cars</Text>
+                <Text style={styles.heroCount}>
+                  {t("feature.carRental.heroCount", { count: filteredCars.length })}
+                </Text>
               </View>
 
-              <Text style={styles.heroTitle}>Find your perfect rental car</Text>
+              <Text style={styles.heroTitle}>{t("feature.carRental.heroTitle")}</Text>
               <Text style={styles.heroSubtitle}>
-                Filter by date, price, Thailand location, and brand in one
-                place.
+                {t("feature.carRental.heroSubtitle")}
               </Text>
             </LinearGradient>
           </View>
 
           <View style={[styles.filterPanel, { width: contentWidth }]}>
             <View style={styles.filterHeaderRow}>
-              <Text style={styles.filterTitle}>Filters</Text>
+              <Text style={styles.filterTitle}>{t("feature.carRental.filtersTitle")}</Text>
               <Pressable onPress={resetFilters} style={styles.resetButton}>
-                <Text style={styles.resetButtonText}>Reset all</Text>
+                <Text style={styles.resetButtonText}>
+                  {t("feature.carRental.resetAll")}
+                </Text>
               </Pressable>
             </View>
 
-            <Text style={styles.filterLabel}>Pickup date (YYYY-MM-DD)</Text>
+            <Text style={styles.filterLabel}>
+              {t("feature.carRental.pickupDateLabel")}
+            </Text>
             <TextInput
-              accessibilityLabel="Pickup date"
+              accessibilityLabel={t("feature.carRental.pickupDateA11y")}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="numbers-and-punctuation"
               onChangeText={setPickupDateInput}
-              placeholder="2026-03-10"
+              placeholder={t("feature.carRental.pickupDatePlaceholder")}
               placeholderTextColor="#94A3B8"
               style={[
                 styles.dateInput,
@@ -368,27 +392,31 @@ export default function FeatureScreen() {
               ]}
             >
               {isDateInvalid
-                ? "Invalid format. Use YYYY-MM-DD."
-                : "Leave empty to show cars for all dates."}
+                ? t("feature.carRental.invalidDateHint")
+                : t("feature.carRental.validDateHint")}
             </Text>
 
-            <Text style={styles.filterLabel}>Price per day</Text>
+            <Text style={styles.filterLabel}>
+              {t("feature.carRental.pricePerDayLabel")}
+            </Text>
             <View style={styles.filterChipWrap}>
               {PRICE_FILTERS.map((option) => (
                 <FilterChip
                   active={selectedMaxPrice === option.value}
-                  key={option.label}
-                  label={option.label}
+                  key={option.key}
+                  label={t(`feature.carRental.priceFilters.${option.key}`)}
                   onPress={() => setSelectedMaxPrice(option.value)}
                 />
               ))}
             </View>
 
-            <Text style={styles.filterLabel}>Location (Thailand)</Text>
+            <Text style={styles.filterLabel}>
+              {t("feature.carRental.locationLabel")}
+            </Text>
             <View style={styles.filterChipWrap}>
               <FilterChip
                 active={selectedLocation === ALL_LOCATIONS}
-                label={ALL_LOCATIONS}
+                label={t("feature.carRental.allThailand")}
                 onPress={() => setSelectedLocation(ALL_LOCATIONS)}
               />
               {THAILAND_LOCATIONS.map((location) => (
@@ -401,11 +429,11 @@ export default function FeatureScreen() {
               ))}
             </View>
 
-            <Text style={styles.filterLabel}>Car brand</Text>
+            <Text style={styles.filterLabel}>{t("feature.carRental.brandLabel")}</Text>
             <View style={styles.filterChipWrap}>
               <FilterChip
                 active={selectedBrand === ALL_BRANDS}
-                label={ALL_BRANDS}
+                label={t("feature.carRental.allBrands")}
                 onPress={() => setSelectedBrand(ALL_BRANDS)}
               />
               {CAR_BRANDS.map((brand) => (
@@ -420,9 +448,11 @@ export default function FeatureScreen() {
           </View>
 
           <View style={[styles.resultHeader, { width: contentWidth }]}>
-            <Text style={styles.resultTitle}>Available cars</Text>
+            <Text style={styles.resultTitle}>
+              {t("feature.carRental.availableCarsTitle")}
+            </Text>
             <Text style={styles.resultSubtitle}>
-              Sorted by best daily price for your filters.
+              {t("feature.carRental.availableCarsSubtitle")}
             </Text>
           </View>
 
@@ -437,13 +467,13 @@ export default function FeatureScreen() {
                   size={22}
                 />
                 <Text style={styles.emptyStateTitle}>
-                  No cars match this filter set
+                  {t("feature.carRental.noResultsTitle")}
                 </Text>
                 <Text style={styles.emptyStateText}>
-                  Try a higher price limit or switch location and brand filters.
+                  {t("feature.carRental.noResultsBody")}
                 </Text>
                 <Pressable
-                  accessibilityLabel="Reset filters"
+                  accessibilityLabel={t("feature.carRental.resetFilters")}
                   accessibilityRole="button"
                   onPress={resetFilters}
                   style={({ pressed }) => [
@@ -451,7 +481,9 @@ export default function FeatureScreen() {
                     pressed ? styles.emptyResetButtonPressed : null,
                   ]}
                 >
-                  <Text style={styles.emptyResetButtonText}>Reset filters</Text>
+                  <Text style={styles.emptyResetButtonText}>
+                    {t("feature.carRental.resetFilters")}
+                  </Text>
                 </Pressable>
               </View>
             )}
@@ -473,7 +505,7 @@ export default function FeatureScreen() {
         },
       ]}
     >
-      <Stack.Screen options={{ title: feature?.label ?? "Feature" }} />
+      <Stack.Screen options={{ title: featureTitle }} />
 
       <LinearGradient
         colors={["#ECF3FF", "#F7F9FF"]}
@@ -485,24 +517,19 @@ export default function FeatureScreen() {
       <View
         style={[styles.placeholderCard, { width: Math.min(contentWidth, 640) }]}
       >
-        <Text style={styles.placeholderTitle}>
-          {feature?.label ?? "Feature"}
-        </Text>
+        <Text style={styles.placeholderTitle}>{featureTitle}</Text>
         <Text style={styles.placeholderSubtitle}>
-          Route key: {params.key ?? "unknown"}
+          {t("feature.routeKey", { key: params.key ?? "unknown" })}
         </Text>
-        <Text style={styles.placeholderBody}>
-          This module is still a placeholder. Car Rental now has a dedicated
-          list + filters experience.
-        </Text>
+        <Text style={styles.placeholderBody}>{t("feature.placeholderBody")}</Text>
 
         <Pressable
-          accessibilityLabel="Go back"
+          accessibilityLabel={t("common.goBack")}
           accessibilityRole="button"
           onPress={() => router.back()}
           style={styles.placeholderButton}
         >
-          <Text style={styles.placeholderButtonText}>Go back</Text>
+          <Text style={styles.placeholderButtonText}>{t("common.goBack")}</Text>
         </Pressable>
       </View>
     </View>

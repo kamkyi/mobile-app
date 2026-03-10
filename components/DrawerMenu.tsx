@@ -10,6 +10,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { useTranslation } from "react-i18next";
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -22,6 +23,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { useDrawer } from "@/context/DrawerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import {
+  resolveAppLanguage,
+  setAppLanguage,
+  SUPPORTED_LANGUAGES,
+  type AppLanguage,
+} from "@/i18n";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -55,9 +62,9 @@ function formatAuthMethod(method?: string): string {
     .trim();
 }
 
-function formatDate(iso?: string): string {
+function formatDate(iso: string | undefined, locale: string): string {
   if (!iso) return "";
-  return new Date(iso).toLocaleDateString("en-US", {
+  return new Date(iso).toLocaleDateString(locale, {
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -238,7 +245,9 @@ export default function DrawerMenu() {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const colorScheme = useColorScheme();
+  const { t, i18n } = useTranslation();
   const palette = usePalette(colorScheme ?? "light");
+  const activeLanguage = resolveAppLanguage(i18n.resolvedLanguage ?? i18n.language);
 
   const drawerWidth = Math.min(screenWidth * DRAWER_WIDTH_FRACTION, 320);
 
@@ -274,24 +283,24 @@ export default function DrawerMenu() {
   const navItems: NavItem[] = [
     {
       key: "home",
-      label: "Home",
+      label: t("drawer.nav.home"),
       icon: "home-outline",
       route: "/",
     },
     {
       key: "explore",
-      label: "Explore",
+      label: t("drawer.nav.explore"),
       icon: "compass-outline",
       route: "/(tabs)/explore",
     },
     {
       key: "settings",
-      label: "Settings",
+      label: t("drawer.nav.settings"),
       icon: "settings-outline",
     },
     {
       key: "notifications",
-      label: "Notifications",
+      label: t("drawer.nav.notifications"),
       icon: "notifications-outline",
     },
   ];
@@ -306,6 +315,10 @@ export default function DrawerMenu() {
   const handleLogout = () => {
     close();
     setTimeout(() => logout(), 300);
+  };
+
+  const handleLanguagePress = (language: AppLanguage) => {
+    void setAppLanguage(language);
   };
 
   if (!modalVisible) return null;
@@ -358,7 +371,7 @@ export default function DrawerMenu() {
             onPress={close}
             style={styles.closeBtn}
             hitSlop={12}
-            accessibilityLabel="Close menu"
+            accessibilityLabel={t("drawer.closeMenuA11y")}
           >
             <Ionicons name="close" size={22} color="rgba(255,255,255,0.85)" />
           </Pressable>
@@ -373,7 +386,7 @@ export default function DrawerMenu() {
 
           {/* Name */}
           <Text style={styles.profileName} numberOfLines={1}>
-            {user?.name ?? "Guest"}
+            {user?.name ?? t("common.appName")}
           </Text>
 
           {/* Email + verified badge */}
@@ -389,7 +402,7 @@ export default function DrawerMenu() {
                 ]}
               >
                 <Ionicons name="checkmark-circle" size={12} color="#4ADE80" />
-                <Text style={styles.verifiedText}>Verified</Text>
+                <Text style={styles.verifiedText}>{t("drawer.verified")}</Text>
               </View>
             )}
           </View>
@@ -424,7 +437,7 @@ export default function DrawerMenu() {
                 color={palette.subtext}
               />
               <Text style={[styles.infoLabel, { color: palette.subtext }]}>
-                Locale
+                {t("drawer.locale")}
               </Text>
               <Text style={[styles.infoValue, { color: palette.text }]}>
                 {user.locale}
@@ -439,13 +452,68 @@ export default function DrawerMenu() {
                 color={palette.subtext}
               />
               <Text style={[styles.infoLabel, { color: palette.subtext }]}>
-                Member since
+                {t("drawer.memberSince")}
               </Text>
               <Text style={[styles.infoValue, { color: palette.text }]}>
-                {formatDate(user.createdAt)}
+                {formatDate(user.createdAt, i18n.resolvedLanguage ?? "en")}
               </Text>
             </View>
           )}
+        </View>
+
+        <View
+          style={[
+            styles.languageCard,
+            { backgroundColor: palette.surface, borderColor: palette.divider },
+          ]}
+        >
+          <Text style={[styles.sectionLabel, styles.languageLabel, { color: palette.subtext }]}>
+            {t("language.sectionTitle").toUpperCase()}
+          </Text>
+          <View style={styles.languageOptions}>
+            {SUPPORTED_LANGUAGES.map((language) => {
+              const selected = activeLanguage === language;
+              const languageName = t(`language.${language}`);
+              const shortKey =
+                language === "en"
+                  ? "shortEn"
+                  : language === "my"
+                    ? "shortMy"
+                    : language === "zh"
+                      ? "shortZh"
+                      : "shortTh";
+
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={languageName}
+                  key={language}
+                  onPress={() => handleLanguagePress(language)}
+                  style={({ pressed }) => [
+                    styles.languageChip,
+                    {
+                      backgroundColor: selected
+                        ? "rgba(59,130,246,0.15)"
+                        : "rgba(148,163,184,0.1)",
+                      borderColor: selected
+                        ? "rgba(59,130,246,0.5)"
+                        : "rgba(148,163,184,0.3)",
+                    },
+                    pressed && { opacity: 0.7 },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.languageChipText,
+                      { color: selected ? palette.accent : palette.text },
+                    ]}
+                  >
+                    {t(`language.${shortKey}`)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
 
         {/* ── Divider ───────────────────────────────────── */}
@@ -454,7 +522,7 @@ export default function DrawerMenu() {
         {/* ── Navigation ────────────────────────────────── */}
         <View style={styles.navSection}>
           <Text style={[styles.sectionLabel, { color: palette.subtext }]}>
-            NAVIGATION
+            {t("drawer.navigation").toUpperCase()}
           </Text>
           {navItems.map((item) => (
             <NavRow
@@ -481,13 +549,13 @@ export default function DrawerMenu() {
               styles.logoutBtn,
               pressed && { opacity: 0.75 },
             ]}
-            accessibilityLabel="Log out"
+            accessibilityLabel={t("drawer.logOutA11y")}
             accessibilityRole="button"
           >
             <View style={styles.logoutIconWrap}>
               <Ionicons name="log-out-outline" size={18} color="#EF4444" />
             </View>
-            <Text style={styles.logoutLabel}>Log Out</Text>
+            <Text style={styles.logoutLabel}>{t("drawer.logOut")}</Text>
             <Ionicons
               name="chevron-forward"
               size={16}
@@ -497,7 +565,7 @@ export default function DrawerMenu() {
           </Pressable>
 
           <Text style={[styles.footerVersion, { color: palette.subtext }]}>
-            Links · v1.0.0
+            {t("common.appName")} · v1.0.0
           </Text>
         </View>
       </Animated.View>
@@ -627,6 +695,40 @@ const styles = StyleSheet.create({
   infoValue: {
     fontSize: 13,
     fontWeight: "600",
+  },
+  languageCard: {
+    marginHorizontal: 14,
+    marginTop: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 12,
+    gap: 10,
+  },
+  languageLabel: {
+    marginBottom: 0,
+    marginLeft: 0,
+    letterSpacing: 0.7,
+  },
+  languageOptions: {
+    flexDirection: "row",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  languageChip: {
+    minWidth: 56,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  languageChipText: {
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.2,
   },
 
   // ── Divider

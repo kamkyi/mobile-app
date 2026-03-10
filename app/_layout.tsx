@@ -6,6 +6,8 @@ import {
 import { Image } from "expo-image";
 import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import "react-native-reanimated";
 
@@ -13,12 +15,15 @@ import DrawerMenu from "@/components/DrawerMenu";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { DrawerProvider, useDrawer } from "@/context/DrawerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { initializeLanguageFromStorage } from "@/i18n";
 
 function HeaderBrand() {
+  const { t } = useTranslation();
+
   return (
     <View style={styles.brandWrap}>
       <View style={styles.brandDot} />
-      <Text style={styles.brandText}>Links</Text>
+      <Text style={styles.brandText}>{t("common.appName")}</Text>
     </View>
   );
 }
@@ -27,6 +32,7 @@ function HeaderActionButton() {
   const { isAuthenticated, user } = useAuth();
   const { open } = useDrawer();
   const router = useRouter();
+  const { t } = useTranslation();
 
   if (!isAuthenticated) {
     return (
@@ -36,10 +42,10 @@ function HeaderActionButton() {
           styles.headerButton,
           pressed ? styles.buttonPressed : null,
         ]}
-        accessibilityLabel="Log in"
+        accessibilityLabel={t("header.logInA11y")}
         accessibilityRole="button"
       >
-        <Text style={styles.loginButtonText}>Login</Text>
+        <Text style={styles.loginButtonText}>{t("common.login")}</Text>
       </Pressable>
     );
   }
@@ -52,7 +58,7 @@ function HeaderActionButton() {
         styles.accountButton,
         pressed && styles.buttonPressed,
       ]}
-      accessibilityLabel="Open menu"
+      accessibilityLabel={t("header.openMenuA11y")}
       accessibilityRole="button"
     >
       {user?.profilePictureUrl ? (
@@ -74,7 +80,7 @@ function HeaderActionButton() {
           </Text>
         </View>
       )}
-      <Text style={styles.accountText}>Menu</Text>
+      <Text style={styles.accountText}>{t("common.menu")}</Text>
     </Pressable>
   );
 }
@@ -83,6 +89,11 @@ function HeaderActionButton() {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const { t } = useTranslation();
+
+  useEffect(() => {
+    void initializeLanguageFromStorage();
+  }, []);
 
   return (
     <AuthProvider>
@@ -92,7 +103,7 @@ export default function RootLayout() {
         >
           <Stack
             screenOptions={{
-              headerBackTitle: "Back",
+              headerBackTitle: t("common.back"),
               headerStyle: { backgroundColor: "#0A2540" },
               headerTintColor: "#FFFFFF",
               headerTitleStyle: { color: "#FFFFFF" },
@@ -107,15 +118,18 @@ export default function RootLayout() {
                 headerRight: HeaderActionButton,
               }}
             />
-            <Stack.Screen name="login" options={{ title: "Login" }} />
-            <Stack.Screen name="feature/[key]" options={{ title: "Feature" }} />
+            <Stack.Screen name="login" options={{ title: t("common.login") }} />
+            <Stack.Screen
+              name="feature/[key]"
+              options={{ title: t("feature.defaultTitle") }}
+            />
             <Stack.Screen
               name="auth/callback"
               options={{ headerShown: false }}
             />
             <Stack.Screen
               name="modal"
-              options={{ presentation: "modal", title: "Modal" }}
+              options={{ presentation: "modal", title: t("modal.title") }}
             />
           </Stack>
           <DrawerMenu />

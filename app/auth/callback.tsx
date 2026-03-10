@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { useAuth } from "@/context/AuthContext";
 
@@ -27,6 +28,7 @@ export default function AuthCallbackScreen() {
   const params = useLocalSearchParams();
   const { isAuthenticated, isLoading, finishWorkOSLoginFromCallback } =
     useAuth();
+  const { t } = useTranslation();
   const [callbackError, setCallbackError] = useState<string | null>(null);
   const callbackParams = useMemo(
     () => ({
@@ -50,7 +52,7 @@ export default function AuthCallbackScreen() {
     }
 
     if (!callbackParams.code && !callbackParams.error) {
-      setCallbackError("Missing WorkOS callback details. Start the login flow again.");
+      setCallbackError(t("authCallback.missingDetails"));
       return;
     }
 
@@ -70,14 +72,19 @@ export default function AuthCallbackScreen() {
         setCallbackError(
           error instanceof Error
             ? error.message
-            : "Unable to complete WorkOS sign in.",
+            : t("authCallback.unableToComplete"),
         );
       });
 
     return () => {
       isMounted = false;
     };
-  }, [callbackParams, finishWorkOSLoginFromCallback, isAuthenticated]);
+  }, [
+    callbackParams,
+    finishWorkOSLoginFromCallback,
+    isAuthenticated,
+    t,
+  ]);
 
   if (isAuthenticated) {
     return <Redirect href="/" />;
@@ -87,10 +94,10 @@ export default function AuthCallbackScreen() {
     <View style={styles.container}>
       {callbackError ? (
         <View style={styles.errorCard}>
-          <Text style={styles.errorTitle}>Sign in failed</Text>
+          <Text style={styles.errorTitle}>{t("authCallback.signInFailed")}</Text>
           <Text style={styles.errorMessage}>{callbackError}</Text>
           <Pressable
-            accessibilityLabel="Back to login"
+            accessibilityLabel={t("authCallback.backToLogin")}
             accessibilityRole="button"
             onPress={() => router.replace("/login")}
             style={({ pressed }) => [
@@ -98,14 +105,18 @@ export default function AuthCallbackScreen() {
               pressed ? styles.retryButtonPressed : null,
             ]}
           >
-            <Text style={styles.retryButtonLabel}>Back to login</Text>
+            <Text style={styles.retryButtonLabel}>
+              {t("authCallback.backToLogin")}
+            </Text>
           </Pressable>
         </View>
       ) : (
         <>
           <ActivityIndicator size="small" color="#3B82F6" />
           <Text style={styles.label}>
-            {isLoading ? "Completing sign in..." : "Finishing WorkOS login..."}
+            {isLoading
+              ? t("authCallback.completing")
+              : t("authCallback.finishing")}
           </Text>
         </>
       )}

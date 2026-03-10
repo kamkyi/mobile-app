@@ -21,6 +21,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useTranslation } from "react-i18next";
 import Animated, {
   Extrapolation,
   interpolate,
@@ -65,32 +66,36 @@ const HERO_AUTO_MS = 45_000;
 
 type HeroSlide = {
   key: string;
-  title: string;
-  subtitle: string;
-  badge: string;
+  titleKey: string;
+  subtitleKey: string;
+  badgeKey: string;
+  badgePrefix: string;
   image: string;
 };
 
 const HERO_SLIDES: HeroSlide[] = [
   {
     key: "hero-1",
-    title: "Book Faster.\nMove Smarter.",
-    subtitle: "Trusted rides, food & local services — all in one tap.",
-    badge: "\u26a1 TRENDING",
+    titleKey: "home.heroSlides.hero1.title",
+    subtitleKey: "home.heroSlides.hero1.subtitle",
+    badgeKey: "home.heroSlides.hero1.badge",
+    badgePrefix: "\u26a1",
     image: "https://picsum.photos/id/338/1200/600",
   },
   {
     key: "hero-2",
-    title: "Everything Near\nYou in Seconds",
-    subtitle: "Discover doctors, beauty, travel & more nearby.",
-    badge: "\ud83d\udccd LOCAL PICKS",
+    titleKey: "home.heroSlides.hero2.title",
+    subtitleKey: "home.heroSlides.hero2.subtitle",
+    badgeKey: "home.heroSlides.hero2.badge",
+    badgePrefix: "\ud83d\udccd",
     image: "https://picsum.photos/id/1059/1200/600",
   },
   {
     key: "hero-3",
-    title: "Daily Essentials,\nBeautifully Simple",
-    subtitle: "One Links app for your complete city lifestyle.",
-    badge: "\u2728 SMART FLOW",
+    titleKey: "home.heroSlides.hero3.title",
+    subtitleKey: "home.heroSlides.hero3.subtitle",
+    badgeKey: "home.heroSlides.hero3.badge",
+    badgePrefix: "\u2728",
     image: "https://picsum.photos/id/1060/1200/600",
   },
 ];
@@ -203,6 +208,7 @@ export default function LandingScreen() {
     useHydratedWindowDimensions();
   const router = useRouter();
   const { isAuthenticated } = useAuth();
+  const { t } = useTranslation();
 
   const heroListRef = useRef<FlatList<HeroSlide>>(null);
   // ScrollView ref for the horizontal feature page slider
@@ -308,6 +314,16 @@ export default function LandingScreen() {
     [isAuthenticated, router],
   );
 
+  const getFeatureLabel = useCallback(
+    (featureKey: string) => t(`features.items.${featureKey}`),
+    [t],
+  );
+
+  const getChipLabel = useCallback(
+    (chipKey: string) => t(`features.chips.${chipKey}`),
+    [t],
+  );
+
   // ─── Render ────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView edges={["top", "bottom"]} style={styles.safe}>
@@ -366,7 +382,9 @@ export default function LandingScreen() {
                   style={styles.heroGrad}
                 >
                   <View style={styles.heroBadgeWrap}>
-                    <Text style={styles.heroBadgeText}>{item.badge}</Text>
+                    <Text style={styles.heroBadgeText}>
+                      {item.badgePrefix} {t(item.badgeKey)}
+                    </Text>
                   </View>
                   <Text
                     style={[
@@ -374,9 +392,9 @@ export default function LandingScreen() {
                       { fontSize: heroFs, lineHeight: heroFs * 1.28 },
                     ]}
                   >
-                    {item.title}
+                    {t(item.titleKey)}
                   </Text>
-                  <Text style={styles.heroSubtitle}>{item.subtitle}</Text>
+                  <Text style={styles.heroSubtitle}>{t(item.subtitleKey)}</Text>
                 </LinearGradient>
               </ImageBackground>
             )}
@@ -384,7 +402,7 @@ export default function LandingScreen() {
             showsHorizontalScrollIndicator={false}
           />
 
-          <View accessibilityLabel="Hero slides" style={styles.heroDots}>
+          <View accessibilityLabel={t("home.heroSlidesA11y")} style={styles.heroDots}>
             {HERO_SLIDES.map((s, i) => (
               <Pressable hitSlop={10} key={s.key} onPress={() => goHero(i)}>
                 <HeroDot active={i === heroIdx} />
@@ -399,9 +417,11 @@ export default function LandingScreen() {
         >
           {/* Title/subtitle reflects the active page */}
           <View style={styles.sectionHead}>
-            <Text style={styles.sectionTitle}>{PAGES[currentPage]?.title}</Text>
+            <Text style={styles.sectionTitle}>
+              {t(`home.pages.${currentPage}.title`)}
+            </Text>
             <Text style={styles.sectionSub}>
-              {PAGES[currentPage]?.subtitle}
+              {t(`home.pages.${currentPage}.subtitle`)}
             </Text>
           </View>
 
@@ -451,7 +471,7 @@ export default function LandingScreen() {
                       {row.map((feat) => (
                         <FeatureCard
                           key={feat.key}
-                          item={feat}
+                          item={{ ...feat, label: getFeatureLabel(feat.key) }}
                           width={cardW}
                           cardH={CARD_H}
                           iconCircleSize={iconCircleSize}
@@ -490,7 +510,7 @@ export default function LandingScreen() {
 
         {/* ━━ Popular chips ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
         <View style={[styles.chipsSection, { width: contentW }]}>
-          <Text style={styles.chipsTitle}>Popular Near You</Text>
+          <Text style={styles.chipsTitle}>{t("home.popularNearYou")}</Text>
           <ScrollView
             contentContainerStyle={styles.chips}
             horizontal
@@ -498,14 +518,14 @@ export default function LandingScreen() {
           >
             {PAGES[currentPage]?.popularChips.map((chip) => (
               <Pressable
-                accessibilityLabel={chip.label}
+                accessibilityLabel={getChipLabel(chip.key)}
                 accessibilityRole="button"
                 hitSlop={8}
                 key={chip.key}
                 onPress={() => onChipPress(chip)}
                 style={styles.chip}
               >
-                <Text style={styles.chipText}>{chip.label}</Text>
+                <Text style={styles.chipText}>{getChipLabel(chip.key)}</Text>
               </Pressable>
             ))}
           </ScrollView>
