@@ -69,6 +69,8 @@ Current env keys:
 - `EXPO_PUBLIC_WORKOS_DOMAIN_HINT` - Optional domain hint
 - `EXPO_PUBLIC_WORKOS_LOGIN_HINT` - Optional login email hint
 
+Use `EXPO_PUBLIC_WORKOS_REDIRECT_PATH=auth/callback` for the path only. If you need a full GitHub Pages callback URL, set `EXPO_PUBLIC_WORKOS_WEB_REDIRECT_URI` to just the URL value, not `KEY=value`.
+
 Register these redirect URIs in WorkOS AuthKit:
 
 ```txt

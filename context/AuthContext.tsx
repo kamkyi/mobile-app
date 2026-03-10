@@ -273,6 +273,23 @@ function getEnvString(name: string): string | undefined {
   return value ? value : undefined;
 }
 
+function isAbsoluteUrl(value: string): boolean {
+  return /^[a-z][a-z0-9+\-.]*:\/\//i.test(value);
+}
+
+function normalizeConfiguredRedirectUri(value: string): string {
+  const withoutAssignment = value.replace(/^[A-Z0-9_]+=/, "");
+  const duplicateAssignmentIndex = withoutAssignment.search(
+    /(?=EXPO_PUBLIC_[A-Z0-9_]+=)/,
+  );
+  const cleanedValue =
+    duplicateAssignmentIndex >= 0
+      ? withoutAssignment.slice(0, duplicateAssignmentIndex)
+      : withoutAssignment;
+
+  return cleanedValue.replace(/\/+$/g, "");
+}
+
 function getWebRedirectPath(path: string): string {
   const normalizedPath = path.replace(/^\/+/, "");
   const baseUrl = Constants.expoConfig?.experiments?.baseUrl;
@@ -288,9 +305,9 @@ function getWebRedirectPath(path: string): string {
 }
 
 function getWebRedirectUri(path: string): string {
-  const configuredUri = process.env.EXPO_PUBLIC_WORKOS_WEB_REDIRECT_URI?.trim();
+  const configuredUri = getEnvString("EXPO_PUBLIC_WORKOS_WEB_REDIRECT_URI");
   if (configuredUri) {
-    return configuredUri.replace(/\/+$/g, "");
+    return normalizeConfiguredRedirectUri(configuredUri);
   }
 
   return AuthSession.makeRedirectUri({
@@ -299,9 +316,9 @@ function getWebRedirectUri(path: string): string {
 }
 
 function getNativeRedirectUri(path: string): string {
-  const configuredUri = process.env.EXPO_PUBLIC_WORKOS_REDIRECT_URI?.trim();
+  const configuredUri = getEnvString("EXPO_PUBLIC_WORKOS_REDIRECT_URI");
   if (configuredUri) {
-    return configuredUri.replace(/\/+$/g, "");
+    return normalizeConfiguredRedirectUri(configuredUri);
   }
 
   if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
@@ -551,12 +568,17 @@ export function AuthProvider({ children }: PropsWithChildren) {
       }
 
       const baseUrl = getWorkOSBaseUrl();
-      const redirectPath =
+      const configuredRedirectPath =
         process.env.EXPO_PUBLIC_WORKOS_REDIRECT_PATH?.trim() ||
         DEFAULT_REDIRECT_PATH;
+      const redirectPath = isAbsoluteUrl(configuredRedirectPath)
+        ? DEFAULT_REDIRECT_PATH
+        : configuredRedirectPath;
       const redirectUri =
         Platform.OS === "web"
-          ? getWebRedirectUri(redirectPath)
+          ? isAbsoluteUrl(configuredRedirectPath)
+            ? normalizeConfiguredRedirectUri(configuredRedirectPath)
+            : getWebRedirectUri(redirectPath)
           : getNativeRedirectUri(redirectPath);
       const isExpoGoNativeRuntime =
         Platform.OS !== "web" &&
@@ -574,6 +596,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
         platform: Platform.OS,
         redirectUri,
       });
+
+      if (configuredRedirectPath !== redirectPath) {
+        console.warn(
+          "EXPO_PUBLIC_WORKOS_REDIRECT_PATH must be a path like auth/callback. Using a safe fallback path and treating the configured absolute URL as the web redirect URI.",
+          configuredRedirectPath,
+        );
+      }
 
       if (isExpoGoNativeRuntime) {
         console.warn(
