@@ -12,9 +12,11 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import "react-native-reanimated";
 
 import DrawerMenu from "@/components/DrawerMenu";
+import { AppDataProvider } from "@/context/AppDataContext";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { DrawerProvider, useDrawer } from "@/context/DrawerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { syncCalendarLocale } from "@/i18n/calendar-locale";
 import { initializeLanguageFromStorage } from "@/i18n";
 
 function HeaderBrand() {
@@ -89,53 +91,59 @@ function HeaderActionButton() {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   useEffect(() => {
     void initializeLanguageFromStorage();
   }, []);
 
+  useEffect(() => {
+    syncCalendarLocale(i18n.resolvedLanguage ?? i18n.language);
+  }, [i18n.language, i18n.resolvedLanguage]);
+
   return (
     <AuthProvider>
-      <DrawerProvider>
-        <ThemeProvider
-          value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
-        >
-          <Stack
-            screenOptions={{
-              headerBackTitle: t("common.back"),
-              headerStyle: { backgroundColor: "#0A2540" },
-              headerTintColor: "#FFFFFF",
-              headerTitleStyle: { color: "#FFFFFF" },
-            }}
+      <AppDataProvider>
+        <DrawerProvider>
+          <ThemeProvider
+            value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
           >
-            <Stack.Screen
-              name="index"
-              options={{
-                headerTitle: HeaderBrand,
-                headerTitleAlign: "left",
-                headerLeft: () => null,
-                headerRight: HeaderActionButton,
+            <Stack
+              screenOptions={{
+                headerBackTitle: t("common.back"),
+                headerStyle: { backgroundColor: "#0A2540" },
+                headerTintColor: "#FFFFFF",
+                headerTitleStyle: { color: "#FFFFFF" },
               }}
-            />
-            <Stack.Screen name="login" options={{ title: t("common.login") }} />
-            <Stack.Screen
-              name="feature/[key]"
-              options={{ title: t("feature.defaultTitle") }}
-            />
-            <Stack.Screen
-              name="auth/callback"
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
-              name="modal"
-              options={{ presentation: "modal", title: t("modal.title") }}
-            />
-          </Stack>
-          <DrawerMenu />
-          <StatusBar style="auto" />
-        </ThemeProvider>
-      </DrawerProvider>
+            >
+              <Stack.Screen
+                name="index"
+                options={{
+                  headerTitle: HeaderBrand,
+                  headerTitleAlign: "left",
+                  headerLeft: () => null,
+                  headerRight: HeaderActionButton,
+                }}
+              />
+              <Stack.Screen name="login" options={{ title: t("common.login") }} />
+              <Stack.Screen
+                name="feature/[key]"
+                options={{ title: t("feature.defaultTitle") }}
+              />
+              <Stack.Screen
+                name="auth/callback"
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="modal"
+                options={{ presentation: "modal", title: t("modal.title") }}
+              />
+            </Stack>
+            <DrawerMenu />
+            <StatusBar style="auto" />
+          </ThemeProvider>
+        </DrawerProvider>
+      </AppDataProvider>
     </AuthProvider>
   );
 }
@@ -183,10 +191,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   accountButton: {
-    minHeight: 36,
+    minHeight: 40,
     borderRadius: 18,
     paddingLeft: 4,
-    paddingRight: 10,
+    paddingRight: 12,
+    paddingVertical: 4,
     alignItems: "center",
     flexDirection: "row",
     backgroundColor: "rgba(255,255,255,0.14)",
@@ -199,6 +208,7 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: "700",
     letterSpacing: 0.2,
+    lineHeight: 16,
   },
   avatarImage: {
     width: 28,

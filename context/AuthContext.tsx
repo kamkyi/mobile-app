@@ -16,7 +16,7 @@ import { Alert, Platform } from "react-native";
 
 WebBrowser.maybeCompleteAuthSession();
 
-type AuthUser = {
+export type AuthUser = {
   id: string;
   email: string;
   name: string;

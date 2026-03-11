@@ -8,17 +8,22 @@ import {
 } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  type TextStyle,
   TextInput,
   View,
+  type ViewStyle,
 } from "react-native";
 import { useTranslation } from "react-i18next";
+import { Calendar, type DateData } from "react-native-calendars";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { FeatureIcon } from "@/components/ui/feature-icon";
 import {
   CAR_BRANDS,
   CAR_RENTAL_ITEMS,
@@ -29,8 +34,10 @@ import {
 } from "@/constants/car-rental";
 import { FEATURE_MAP } from "@/constants/pages";
 import { Brand, Radius, Spacing } from "@/constants/theme";
+import { useAppData } from "@/context/AppDataContext";
 import { useAuth } from "@/context/AuthContext";
 import { useHydratedWindowDimensions } from "@/hooks/use-hydrated-window-dimensions";
+import { getAppLocaleTag, resolveAppLanguage } from "@/i18n";
 
 type PriceFilter = {
   key: "any" | "upTo1200" | "upTo1800" | "upTo2500";
@@ -44,8 +51,43 @@ const PRICE_FILTERS: PriceFilter[] = [
   { key: "upTo2500", value: 2500 },
 ];
 
+const CYCLE_LENGTH_OPTIONS = [26, 28, 30] as const;
+const PERIOD_LENGTH_OPTIONS = [4, 5, 6] as const;
+
 const ALL_LOCATIONS = "All Thailand";
 const ALL_BRANDS = "All Brands";
+
+type FlowPhase = "fertile" | "period" | "upcoming";
+type FlowSelectionMode = "start" | "end";
+
+type CalendarMark = {
+  customStyles: {
+    container?: ViewStyle;
+    text?: TextStyle;
+  };
+};
+
+/*
+ * Extraction hints for i18next-parser.
+ * t('features.items.nearby')
+ * t('features.items.dating')
+ * t('features.items.visit')
+ * t('features.items.food')
+ * t('features.items.delivery')
+ * t('features.items.doctor')
+ * t('features.items.beauty')
+ * t('features.items.fitness')
+ * t('features.items.shopping')
+ * t('features.items.travel')
+ * t('features.items.support')
+ * t('feature.carRental.priceFilters.any')
+ * t('feature.carRental.priceFilters.upTo1200')
+ * t('feature.carRental.priceFilters.upTo1800')
+ * t('feature.carRental.priceFilters.upTo2500')
+ * t('feature.flow.activePhases.period')
+ * t('feature.flow.activePhases.fertile')
+ * t('feature.flow.activePhases.upcoming')
+ */
 
 function parseIsoDay(value: string): number | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -86,6 +128,66 @@ function formatTHB(value: number): string {
   return `THB ${value.toLocaleString("en-US")}`;
 }
 
+function getTodayIsoDate(): string {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = `${today.getMonth() + 1}`.padStart(2, "0");
+  const day = `${today.getDate()}`.padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function isoFromDay(day: number): string {
+  return new Date(day * 86_400_000).toISOString().slice(0, 10);
+}
+
+function addDaysToIso(iso: string, offset: number): string {
+  const day = parseIsoDay(iso);
+  return day === null ? iso : isoFromDay(day + offset);
+}
+
+function diffInDays(fromIso: string, toIso: string): number {
+  const fromDay = parseIsoDay(fromIso);
+  const toDay = parseIsoDay(toIso);
+
+  if (fromDay === null || toDay === null) {
+    return 0;
+  }
+
+  return toDay - fromDay;
+}
+
+function formatIsoDate(iso: string, localeTag: string): string {
+  const day = parseIsoDay(iso);
+
+  if (day === null) {
+    return iso;
+  }
+
+  return new Intl.DateTimeFormat(localeTag, {
+    day: "numeric",
+    month: "long",
+    timeZone: "UTC",
+    year: "numeric",
+  }).format(new Date(day * 86_400_000));
+}
+
+function setCalendarMark(
+  marks: Record<string, CalendarMark>,
+  date: string,
+  container: ViewStyle,
+  text: TextStyle,
+) {
+  const current = marks[date]?.customStyles;
+
+  marks[date] = {
+    customStyles: {
+      container: { ...current?.container, ...container },
+      text: { ...current?.text, ...text },
+    },
+  };
+}
+
 function FilterChip({
   active,
   label,
@@ -113,6 +215,47 @@ function FilterChip({
         {label}
       </Text>
     </Pressable>
+  );
+}
+
+function FlowStatCard({
+  accent,
+  label,
+  value,
+}: {
+  accent: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <View style={styles.flowStatCard}>
+      <View style={[styles.flowStatAccent, { backgroundColor: accent }]} />
+      <Text style={styles.flowStatLabel}>{label}</Text>
+      <Text style={styles.flowStatValue}>{value}</Text>
+    </View>
+  );
+}
+
+function FlowLegendItem({
+  color,
+  label,
+  outlined = false,
+}: {
+  color: string;
+  label: string;
+  outlined?: boolean;
+}) {
+  return (
+    <View style={styles.flowLegendItem}>
+      <View
+        style={[
+          styles.flowLegendSwatch,
+          { backgroundColor: color },
+          outlined ? styles.flowLegendSwatchOutline : null,
+        ]}
+      />
+      <Text style={styles.flowLegendLabel}>{label}</Text>
+    </View>
   );
 }
 
@@ -214,10 +357,12 @@ export default function FeatureScreen() {
   const { width } = useHydratedWindowDimensions();
   const insets = useSafeAreaInsets();
   const { isAuthenticated } = useAuth();
-  const { t } = useTranslation();
+  const { isReady: isAppDataReady, loadFlowCycles, saveFlowRecord } = useAppData();
+  const { t, i18n } = useTranslation();
 
   const horizontalPadding = width < 380 ? 12 : 16;
   const contentWidth = Math.min(width - horizontalPadding * 2, 760);
+  const todayIso = getTodayIsoDate();
 
   const feature = useMemo(() => {
     if (!params.key) {
@@ -235,6 +380,30 @@ export default function FeatureScreen() {
   const [selectedBrand, setSelectedBrand] = useState<
     CarBrand | typeof ALL_BRANDS
   >(ALL_BRANDS);
+  const [activeFlowSelection, setActiveFlowSelection] =
+    useState<FlowSelectionMode>("start");
+  const [flowRecordId, setFlowRecordId] = useState<string | undefined>();
+  const [flowStartDate, setFlowStartDate] = useState(() => addDaysToIso(todayIso, -4));
+  const [flowEndDate, setFlowEndDate] = useState(() => todayIso);
+  const [cycleLength, setCycleLength] =
+    useState<(typeof CYCLE_LENGTH_OPTIONS)[number]>(28);
+  const [periodLength, setPeriodLength] = useState(5);
+  const [flowHistory, setFlowHistory] = useState<
+    {
+      id: string;
+      startDate: string;
+      endDate: string;
+      cycleLength: number;
+      periodLength: number;
+      updatedAt: string;
+    }[]
+  >([]);
+  const [isFlowLoading, setIsFlowLoading] = useState(false);
+  const [isFlowSaving, setIsFlowSaving] = useState(false);
+  const [flowToast, setFlowToast] = useState<{
+    kind: "error" | "success";
+    message: string;
+  } | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
@@ -245,6 +414,11 @@ export default function FeatureScreen() {
   const pickupDay = useMemo(() => parseIsoDay(pickupDate), [pickupDate]);
   const isDateInvalid = pickupDate.length > 0 && pickupDay === null;
   const isCarRental = params.key === "car-rental";
+  const isFlow = params.key === "flow";
+  const activeLanguage = resolveAppLanguage(
+    i18n.resolvedLanguage ?? i18n.language,
+  );
+  const localeTag = getAppLocaleTag(activeLanguage);
   const shouldRedirectToLogin =
     hasMounted && Boolean(feature?.requiresAuth) && !isAuthenticated;
   const featureTitle = params.key
@@ -298,6 +472,228 @@ export default function FeatureScreen() {
     setSelectedLocation(ALL_LOCATIONS);
     setSelectedBrand(ALL_BRANDS);
   }, []);
+
+  const handleFlowCalendarPress = useCallback(
+    (day: DateData) => {
+      setFlowToast(null);
+
+      if (activeFlowSelection === "start") {
+        setFlowStartDate(day.dateString);
+        if (diffInDays(day.dateString, flowEndDate) < 0) {
+          setFlowEndDate(day.dateString);
+          setPeriodLength(1);
+        } else {
+          setPeriodLength(diffInDays(day.dateString, flowEndDate) + 1);
+        }
+        return;
+      }
+
+      const nextEndDate =
+        diffInDays(flowStartDate, day.dateString) < 0
+          ? flowStartDate
+          : day.dateString;
+
+      setFlowEndDate(nextEndDate);
+      setPeriodLength(diffInDays(flowStartDate, nextEndDate) + 1);
+    },
+    [activeFlowSelection, flowEndDate, flowStartDate],
+  );
+
+  const handlePeriodLengthPress = useCallback((option: (typeof PERIOD_LENGTH_OPTIONS)[number]) => {
+    setFlowToast(null);
+    setPeriodLength(option);
+    setFlowEndDate(addDaysToIso(flowStartDate, option - 1));
+  }, [flowStartDate]);
+
+  const handleSaveFlow = useCallback(async () => {
+    setIsFlowSaving(true);
+    setFlowToast(null);
+
+    try {
+      const savedRecord = await saveFlowRecord({
+        id: flowRecordId,
+        startDate: flowStartDate,
+        endDate: flowEndDate,
+        cycleLength,
+        periodLength,
+      });
+
+      setFlowRecordId(savedRecord.id);
+      setFlowToast({
+        kind: "success",
+        message: t("feature.flow.savedMessage"),
+      });
+
+      const cycles = await loadFlowCycles();
+      setFlowHistory(cycles);
+    } catch (error) {
+      console.warn("Failed to save flow cycle", error);
+      setFlowToast({
+        kind: "error",
+        message: t("feature.flow.saveError"),
+      });
+    } finally {
+      setIsFlowSaving(false);
+    }
+  }, [
+    cycleLength,
+    flowEndDate,
+    flowRecordId,
+    flowStartDate,
+    loadFlowCycles,
+    periodLength,
+    saveFlowRecord,
+    t,
+  ]);
+
+  useEffect(() => {
+    if (!isFlow || !isAppDataReady || !isAuthenticated) {
+      return;
+    }
+
+    let isMounted = true;
+
+    const hydrateFlow = async () => {
+      setIsFlowLoading(true);
+      setFlowToast(null);
+
+      try {
+        const cycles = await loadFlowCycles();
+
+        if (!isMounted) {
+          return;
+        }
+
+        setFlowHistory(cycles);
+
+        const latest = cycles[0];
+        if (!latest) {
+          setFlowRecordId(undefined);
+          setFlowStartDate(addDaysToIso(todayIso, -4));
+          setFlowEndDate(todayIso);
+          setCycleLength(28);
+          setPeriodLength(5);
+          return;
+        }
+
+        setFlowRecordId(latest.id);
+        setFlowStartDate(latest.startDate);
+        setFlowEndDate(latest.endDate);
+        setCycleLength(
+          CYCLE_LENGTH_OPTIONS.includes(
+            latest.cycleLength as (typeof CYCLE_LENGTH_OPTIONS)[number],
+          )
+            ? (latest.cycleLength as (typeof CYCLE_LENGTH_OPTIONS)[number])
+            : 28,
+        );
+        setPeriodLength(latest.periodLength);
+      } catch (error) {
+        console.warn("Failed to load flow data", error);
+      } finally {
+        if (isMounted) {
+          setIsFlowLoading(false);
+        }
+      }
+    };
+
+    void hydrateFlow();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAppDataReady, isAuthenticated, isFlow, loadFlowCycles, todayIso]);
+
+  useEffect(() => {
+    if (!flowToast) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setFlowToast(null);
+    }, 2600);
+
+    return () => clearTimeout(timer);
+  }, [flowToast]);
+
+  const flowStartDay = parseIsoDay(flowStartDate) ?? parseIsoDay(todayIso) ?? 0;
+  const todayDay = parseIsoDay(todayIso) ?? flowStartDay;
+  const nextPeriodDate = isoFromDay(flowStartDay + cycleLength);
+  const fertileStartDate = isoFromDay(flowStartDay + cycleLength - 19);
+  const ovulationDate = isoFromDay(flowStartDay + cycleLength - 14);
+  const fertileEndDate = isoFromDay(flowStartDay + cycleLength - 13);
+  const cycleDay = ((todayDay - flowStartDay) % cycleLength + cycleLength) % cycleLength + 1;
+  const activePhase: FlowPhase =
+    todayDay >= flowStartDay && todayDay < flowStartDay + periodLength
+      ? "period"
+      : todayDay >= flowStartDay + cycleLength - 19 &&
+          todayDay <= flowStartDay + cycleLength - 13
+        ? "fertile"
+        : "upcoming";
+
+  const flowMarkedDates = useMemo(() => {
+    const marks: Record<string, CalendarMark> = {};
+
+    for (let offset = 0; offset < periodLength; offset += 1) {
+      setCalendarMark(
+        marks,
+        isoFromDay(flowStartDay + offset),
+        { backgroundColor: "#FEE2E2", borderRadius: 12 },
+        { color: "#BE123C", fontWeight: "700" },
+      );
+    }
+
+    for (let offset = 0; offset <= 6; offset += 1) {
+      setCalendarMark(
+        marks,
+        isoFromDay(flowStartDay + cycleLength - 19 + offset),
+        { backgroundColor: "#FCE7F3", borderRadius: 12 },
+        { color: "#9D174D", fontWeight: "700" },
+      );
+    }
+
+    setCalendarMark(
+      marks,
+      ovulationDate,
+      {
+        backgroundColor: "#FBCFE8",
+        borderColor: "#E11D48",
+        borderRadius: 12,
+        borderWidth: 1.5,
+      },
+      { color: "#881337", fontWeight: "800" },
+    );
+
+    setCalendarMark(
+      marks,
+      flowStartDate,
+      {
+        borderColor: Brand.primary,
+        borderRadius: 12,
+        borderWidth: 2,
+      },
+      { color: "#881337", fontWeight: "800" },
+    );
+
+    setCalendarMark(
+      marks,
+      flowEndDate,
+      {
+        borderColor: "#BE123C",
+        borderRadius: 12,
+        borderWidth: 2,
+      },
+      { color: "#881337", fontWeight: "800" },
+    );
+
+    return marks;
+  }, [
+    cycleLength,
+    flowEndDate,
+    flowStartDate,
+    flowStartDay,
+    ovulationDate,
+    periodLength,
+  ]);
 
   if (shouldRedirectToLogin) {
     return <Redirect href="/login" />;
@@ -486,6 +882,364 @@ export default function FeatureScreen() {
                   </Text>
                 </Pressable>
               </View>
+            )}
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  if (isFlow) {
+    return (
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop: Math.max(14, insets.top + 6),
+            paddingBottom: Math.max(14, insets.bottom + 8),
+            paddingHorizontal: horizontalPadding,
+          },
+        ]}
+      >
+        <Stack.Screen options={{ title: t("features.items.flow") }} />
+
+        <LinearGradient
+          colors={["#FFF1F5", "#FFF8FB"]}
+          end={{ x: 1, y: 1 }}
+          start={{ x: 0, y: 0 }}
+          style={StyleSheet.absoluteFill}
+        />
+
+        {flowToast ? (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.flowToast,
+              flowToast.kind === "error"
+                ? styles.flowToastError
+                : styles.flowToastSuccess,
+              { top: Math.max(18, insets.top + 8) },
+            ]}
+          >
+            <Ionicons
+              color={flowToast.kind === "error" ? "#991B1B" : "#166534"}
+              name={
+                flowToast.kind === "error"
+                  ? "alert-circle-outline"
+                  : "checkmark-circle-outline"
+              }
+              size={16}
+            />
+            <Text
+              style={[
+                styles.flowToastText,
+                flowToast.kind === "error"
+                  ? styles.flowToastTextError
+                  : styles.flowToastTextSuccess,
+              ]}
+            >
+              {flowToast.message}
+            </Text>
+          </View>
+        ) : null}
+
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={[styles.heroCard, { width: contentWidth }]}>
+            <LinearGradient
+              colors={["#881337", "#BE123C"]}
+              end={{ x: 1, y: 1 }}
+              start={{ x: 0, y: 0 }}
+              style={styles.heroGradient}
+            >
+              <View style={styles.heroTopRow}>
+                <View style={styles.heroTag}>
+                  <FeatureIcon color="#FFFFFF" name="flow" size={14} />
+                  <Text style={styles.heroTagText}>{t("feature.flow.heroTag")}</Text>
+                </View>
+                <Text style={styles.heroCount}>
+                  {t("feature.flow.activePhaseValue", {
+                    value: t(`feature.flow.activePhases.${activePhase}`),
+                  })}
+                </Text>
+              </View>
+
+              <Text style={styles.heroTitle}>{t("feature.flow.heroTitle")}</Text>
+              <Text style={styles.heroSubtitle}>
+                {t("feature.flow.heroSubtitle")}
+              </Text>
+            </LinearGradient>
+          </View>
+
+          <View style={[styles.filterPanel, { width: contentWidth }]}>
+            <Text style={styles.filterTitle}>{t("feature.flow.summaryTitle")}</Text>
+            <Text style={styles.flowSummarySubtitle}>
+              {t("feature.flow.summarySubtitle")}
+            </Text>
+
+            {isFlowLoading ? (
+              <Text style={styles.filterHint}>{t("feature.flow.loading")}</Text>
+            ) : null}
+
+            <View style={styles.flowStatGrid}>
+              <FlowStatCard
+                accent="#E11D48"
+                label={t("feature.flow.cycleDay")}
+                value={t("feature.flow.cycleDayValue", { count: cycleDay })}
+              />
+              <FlowStatCard
+                accent="#BE123C"
+                label={t("feature.flow.nextPeriod")}
+                value={t("feature.flow.inDays", {
+                  count: Math.max(0, diffInDays(todayIso, nextPeriodDate)),
+                })}
+              />
+              <FlowStatCard
+                accent="#DB2777"
+                label={t("feature.flow.ovulation")}
+                value={t("feature.flow.inDays", {
+                  count: Math.max(0, diffInDays(todayIso, ovulationDate)),
+                })}
+              />
+            </View>
+
+            <Text style={styles.filterLabel}>{t("feature.flow.lastPeriodStart")}</Text>
+            <View style={styles.flowDateCardRow}>
+              <Pressable
+                onPress={() => setActiveFlowSelection("start")}
+                style={[
+                  styles.flowDateCard,
+                  activeFlowSelection === "start"
+                    ? styles.flowDateCardActive
+                    : null,
+                ]}
+              >
+                <Text style={styles.flowDateLabel}>
+                  {t("feature.flow.periodStart")}
+                </Text>
+                <Text style={styles.flowDateValue}>
+                  {formatIsoDate(flowStartDate, localeTag)}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setActiveFlowSelection("end")}
+                style={[
+                  styles.flowDateCard,
+                  activeFlowSelection === "end"
+                    ? styles.flowDateCardActive
+                    : null,
+                ]}
+              >
+                <Text style={styles.flowDateLabel}>
+                  {t("feature.flow.periodEnd")}
+                </Text>
+                <Text style={styles.flowDateValue}>
+                  {formatIsoDate(flowEndDate, localeTag)}
+                </Text>
+              </Pressable>
+            </View>
+            <Text style={styles.filterHint}>
+              {t("feature.flow.tapToUpdate", {
+                value:
+                  activeFlowSelection === "start"
+                    ? t("feature.flow.periodStart")
+                    : t("feature.flow.periodEnd"),
+              })}
+            </Text>
+
+            <Text style={styles.filterLabel}>{t("feature.flow.cycleLength")}</Text>
+            <View style={styles.filterChipWrap}>
+              {CYCLE_LENGTH_OPTIONS.map((option) => (
+                <FilterChip
+                  active={cycleLength === option}
+                  key={option}
+                  label={t("feature.flow.dayCount", { count: option })}
+                  onPress={() => setCycleLength(option)}
+                />
+              ))}
+            </View>
+
+            <Text style={styles.filterLabel}>{t("feature.flow.periodLength")}</Text>
+            <View style={styles.filterChipWrap}>
+              {PERIOD_LENGTH_OPTIONS.map((option) => (
+                <FilterChip
+                  active={periodLength === option}
+                  key={option}
+                  label={t("feature.flow.dayCount", { count: option })}
+                  onPress={() => handlePeriodLengthPress(option)}
+                />
+              ))}
+            </View>
+
+            <Pressable
+              accessibilityLabel={t("feature.flow.saveCycle")}
+              accessibilityRole="button"
+              onPress={handleSaveFlow}
+              style={({ pressed }) => [
+                styles.flowSaveButton,
+                (pressed || isFlowSaving) && styles.flowSaveButtonPressed,
+              ]}
+            >
+              {isFlowSaving ? (
+                <View style={styles.flowSaveButtonContent}>
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                  <Text style={styles.flowSaveButtonText}>
+                    {t("feature.flow.saving")}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={styles.flowSaveButtonText}>
+                  {t("feature.flow.saveCycle")}
+                </Text>
+              )}
+            </Pressable>
+          </View>
+
+          <View style={[styles.flowCalendarCard, { width: contentWidth }]}>
+            <Calendar
+              current={flowStartDate}
+              enableSwipeMonths
+              firstDay={1}
+              key={activeLanguage}
+              markedDates={flowMarkedDates}
+              markingType="custom"
+              onDayPress={handleFlowCalendarPress}
+              style={styles.flowCalendar}
+              theme={{
+                arrowColor: Brand.accent,
+                calendarBackground: "#FFFFFF",
+                dayTextColor: Brand.textPrimary,
+                monthTextColor: Brand.primary,
+                textDayFontWeight: "600",
+                textDayHeaderFontWeight: "700",
+                textMonthFontSize: 18,
+                textMonthFontWeight: "800",
+                textSectionTitleColor: Brand.textSecondary,
+                todayTextColor: Brand.primary,
+              }}
+            />
+
+            <View style={styles.flowLegend}>
+              <FlowLegendItem
+                color="#FEE2E2"
+                label={t("feature.flow.legend.period")}
+              />
+              <FlowLegendItem
+                color="#FCE7F3"
+                label={t("feature.flow.legend.fertile")}
+              />
+              <FlowLegendItem
+                color="#FBCFE8"
+                label={t("feature.flow.legend.ovulation")}
+              />
+              <FlowLegendItem
+                color="#FFFFFF"
+                label={t("feature.flow.legend.selected")}
+                outlined
+              />
+              <FlowLegendItem
+                color="#FFFFFF"
+                label={t("feature.flow.legend.end")}
+                outlined
+              />
+            </View>
+          </View>
+
+          <View style={[styles.flowTimelineCard, { width: contentWidth }]}>
+            <Text style={styles.resultTitle}>{t("feature.flow.timelineTitle")}</Text>
+            <Text style={styles.resultSubtitle}>{t("feature.flow.timelineSubtitle")}</Text>
+
+            <View style={styles.flowTimelineRow}>
+              <Ionicons color="#BE123C" name="ellipse" size={10} />
+              <Text style={styles.flowTimelineLabel}>
+                {t("feature.flow.lastPeriodStart")}
+              </Text>
+              <Text style={styles.flowTimelineValue}>
+                {formatIsoDate(flowStartDate, localeTag)}
+              </Text>
+            </View>
+
+            <View style={styles.flowTimelineRow}>
+              <Ionicons color="#F43F5E" name="ellipse" size={10} />
+              <Text style={styles.flowTimelineLabel}>
+                {t("feature.flow.periodEnd")}
+              </Text>
+              <Text style={styles.flowTimelineValue}>
+                {formatIsoDate(flowEndDate, localeTag)}
+              </Text>
+            </View>
+
+            <View style={styles.flowTimelineRow}>
+              <Ionicons color="#DB2777" name="ellipse" size={10} />
+              <Text style={styles.flowTimelineLabel}>
+                {t("feature.flow.fertileWindow")}
+              </Text>
+              <Text style={styles.flowTimelineValue}>
+                {t("feature.flow.dateRange", {
+                  from: formatIsoDate(fertileStartDate, localeTag),
+                  to: formatIsoDate(fertileEndDate, localeTag),
+                })}
+              </Text>
+            </View>
+
+            <View style={styles.flowTimelineRow}>
+              <Ionicons color="#E11D48" name="ellipse" size={10} />
+              <Text style={styles.flowTimelineLabel}>
+                {t("feature.flow.nextPeriod")}
+              </Text>
+              <Text style={styles.flowTimelineValue}>
+                {formatIsoDate(nextPeriodDate, localeTag)}
+              </Text>
+            </View>
+
+            <View style={styles.flowNotice}>
+              <Ionicons color="#BE123C" name="information-circle-outline" size={16} />
+              <Text style={styles.flowNoticeText}>{t("feature.flow.note")}</Text>
+            </View>
+          </View>
+
+          <View style={[styles.flowTimelineCard, { width: contentWidth }]}>
+            <Text style={styles.resultTitle}>{t("feature.flow.historyTitle")}</Text>
+            <Text style={styles.resultSubtitle}>
+              {t("feature.flow.historySubtitle")}
+            </Text>
+            {flowHistory.length > 0 ? (
+              flowHistory.slice(0, 4).map((entry) => (
+                <Pressable
+                  key={entry.id}
+                  onPress={() => {
+                    setFlowRecordId(entry.id);
+                    setFlowStartDate(entry.startDate);
+                    setFlowEndDate(entry.endDate);
+                    setCycleLength(
+                      CYCLE_LENGTH_OPTIONS.includes(
+                        entry.cycleLength as (typeof CYCLE_LENGTH_OPTIONS)[number],
+                      )
+                        ? (entry.cycleLength as (typeof CYCLE_LENGTH_OPTIONS)[number])
+                        : 28,
+                    );
+                    setPeriodLength(entry.periodLength);
+                    setFlowToast(null);
+                  }}
+                  style={styles.flowHistoryCard}
+                >
+                  <Text style={styles.flowHistoryTitle}>
+                    {t("feature.flow.dateRange", {
+                      from: formatIsoDate(entry.startDate, localeTag),
+                      to: formatIsoDate(entry.endDate, localeTag),
+                    })}
+                  </Text>
+                  <Text style={styles.flowHistoryMeta}>
+                    {t("feature.flow.savedOn", {
+                      value: formatIsoDate(entry.updatedAt.slice(0, 10), localeTag),
+                    })}
+                  </Text>
+                </Pressable>
+              ))
+            ) : (
+              <Text style={styles.filterHint}>{t("feature.flow.noHistory")}</Text>
             )}
           </View>
         </ScrollView>
@@ -696,6 +1450,242 @@ const styles = StyleSheet.create({
   },
   filterChipTextActive: {
     color: Brand.accent,
+  },
+  flowSummarySubtitle: {
+    color: Brand.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  flowStatGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 4,
+  },
+  flowStatCard: {
+    flex: 1,
+    minWidth: 150,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: "rgba(225,29,72,0.12)",
+    backgroundColor: "#FFF7FA",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  flowStatAccent: {
+    width: 28,
+    height: 4,
+    borderRadius: 999,
+    marginBottom: 10,
+  },
+  flowStatLabel: {
+    color: Brand.textSecondary,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  flowStatValue: {
+    color: "#881337",
+    fontSize: 18,
+    fontWeight: "800",
+    marginTop: 4,
+  },
+  flowDateValue: {
+    color: Brand.textPrimary,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  flowDateCardRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  flowDateCard: {
+    flex: 1,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: "rgba(15,23,42,0.12)",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  flowDateCardActive: {
+    borderColor: "rgba(225,29,72,0.45)",
+    backgroundColor: "#FFF7FA",
+  },
+  flowDateLabel: {
+    color: Brand.textSecondary,
+    fontSize: 12,
+    fontWeight: "600",
+    marginBottom: 6,
+  },
+  flowSaveButton: {
+    minHeight: 42,
+    borderRadius: Radius.md,
+    backgroundColor: "#BE123C",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
+  },
+  flowSaveButtonPressed: {
+    opacity: 0.86,
+  },
+  flowSaveButtonContent: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  flowSaveButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
+  flowToast: {
+    alignItems: "center",
+    borderRadius: Radius.md,
+    columnGap: 8,
+    left: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    position: "absolute",
+    right: 16,
+    shadowColor: Brand.primary,
+    shadowOpacity: 0.14,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 18,
+    elevation: 5,
+    flexDirection: "row",
+    zIndex: 20,
+  },
+  flowToastSuccess: {
+    backgroundColor: "#ECFDF5",
+    borderWidth: 1,
+    borderColor: "#86EFAC",
+  },
+  flowToastError: {
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FCA5A5",
+  },
+  flowToastText: {
+    flex: 1,
+    fontSize: 12.5,
+    fontWeight: "600",
+    lineHeight: 18,
+  },
+  flowToastTextSuccess: {
+    color: "#166534",
+  },
+  flowToastTextError: {
+    color: "#991B1B",
+  },
+  flowCalendarCard: {
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: "rgba(225,29,72,0.12)",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 8,
+    paddingTop: 8,
+    paddingBottom: 14,
+    shadowColor: Brand.primary,
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 14,
+    elevation: 3,
+  },
+  flowCalendar: {
+    borderRadius: Radius.lg,
+  },
+  flowLegend: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 12,
+    paddingHorizontal: 8,
+  },
+  flowLegendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    columnGap: 6,
+  },
+  flowLegendSwatch: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "rgba(225,29,72,0.18)",
+  },
+  flowLegendSwatchOutline: {
+    borderColor: Brand.primary,
+    borderWidth: 2,
+  },
+  flowLegendLabel: {
+    color: Brand.textSecondary,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  flowTimelineCard: {
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: "rgba(225,29,72,0.12)",
+    backgroundColor: "#FFFFFF",
+    padding: Spacing.base,
+    rowGap: Spacing.sm,
+    shadowColor: Brand.primary,
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 14,
+    elevation: 3,
+  },
+  flowTimelineRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    columnGap: 8,
+  },
+  flowTimelineLabel: {
+    color: Brand.textPrimary,
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  flowTimelineValue: {
+    color: Brand.textSecondary,
+    flex: 1.2,
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: "right",
+  },
+  flowNotice: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    columnGap: 8,
+    borderRadius: Radius.md,
+    backgroundColor: "#FFF1F5",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  flowNoticeText: {
+    color: "#9D174D",
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  flowHistoryCard: {
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: "rgba(15,23,42,0.08)",
+    backgroundColor: "#FFF9FB",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  flowHistoryTitle: {
+    color: Brand.textPrimary,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  flowHistoryMeta: {
+    color: Brand.textSecondary,
+    fontSize: 12,
+    marginTop: 4,
   },
   resultHeader: {
     marginTop: 2,

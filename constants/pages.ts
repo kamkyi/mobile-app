@@ -1,10 +1,9 @@
-import { Ionicons } from "@expo/vector-icons";
-import type { ComponentProps } from "react";
+import type { FeatureIconName } from "@/components/ui/feature-icon";
 
 export type FeatureItem = {
   key: string;
   label: string;
-  iconName: ComponentProps<typeof Ionicons>["name"];
+  iconName: FeatureIconName;
   route: `/feature/${string}`;
   requiresAuth: boolean;
   /** Hex colour used for the icon tint and a soft-tinted circle background */
@@ -157,6 +156,14 @@ export const PAGES: FeaturePage[] = [
         route: "/feature/support",
         requiresAuth: true,
         color: "#22C55E",
+      },
+      {
+        key: "flow",
+        label: "Flow",
+        iconName: "flow",
+        route: "/feature/flow",
+        requiresAuth: true,
+        color: "#E11D48",
       },
     ],
     popularChips: [

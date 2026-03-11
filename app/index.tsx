@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -8,8 +7,7 @@ import {
   useEffect,
   useRef,
   useState,
-  type ComponentProps,
-  type Ref,
+  type ComponentRef,
 } from "react";
 import {
   FlatList,
@@ -34,6 +32,7 @@ import Animated, {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { PAGES, type FeatureItem, type PopularChip } from "@/constants/pages";
+import { FeatureIcon } from "@/components/ui/feature-icon";
 import { useAuth } from "@/context/AuthContext";
 import { useHydratedWindowDimensions } from "@/hooks/use-hydrated-window-dimensions";
 
@@ -100,6 +99,44 @@ const HERO_SLIDES: HeroSlide[] = [
   },
 ];
 
+/*
+ * Extraction hints for i18next-parser.
+ * t('home.heroSlides.hero1.title')
+ * t('home.heroSlides.hero1.subtitle')
+ * t('home.heroSlides.hero1.badge')
+ * t('home.heroSlides.hero2.title')
+ * t('home.heroSlides.hero2.subtitle')
+ * t('home.heroSlides.hero2.badge')
+ * t('home.heroSlides.hero3.title')
+ * t('home.heroSlides.hero3.subtitle')
+ * t('home.heroSlides.hero3.badge')
+ * t('home.pages.0.title')
+ * t('home.pages.0.subtitle')
+ * t('home.pages.1.title')
+ * t('home.pages.1.subtitle')
+ * t('features.items.car-rental')
+ * t('features.items.nearby')
+ * t('features.items.dating')
+ * t('features.items.visit')
+ * t('features.items.food')
+ * t('features.items.delivery')
+ * t('features.items.doctor')
+ * t('features.items.beauty')
+ * t('features.items.fitness')
+ * t('features.items.shopping')
+ * t('features.items.travel')
+ * t('features.items.support')
+ * t('features.items.flow')
+ * t('features.chips.plumber')
+ * t('features.chips.myanmar-food')
+ * t('features.chips.massage')
+ * t('features.chips.cleaning')
+ * t('features.chips.tire-service')
+ * t('features.chips.haircut')
+ * t('features.chips.airport-ride')
+ * t('features.chips.pharmacy')
+ */
+
 // ─── Feature Card ───────────────────────────────────────────────────────────────
 
 type FeatureCardProps = {
@@ -152,11 +189,7 @@ const FeatureCard = memo(function FeatureCard({
             },
           ]}
         >
-          <Ionicons
-            color={item.color}
-            name={item.iconName as ComponentProps<typeof Ionicons>["name"]}
-            size={iconSize}
-          />
+          <FeatureIcon color={item.color} name={item.iconName} size={iconSize} />
         </View>
         <Text numberOfLines={1} style={styles.featureLabel}>
           {item.label}
@@ -212,7 +245,7 @@ export default function LandingScreen() {
 
   const heroListRef = useRef<FlatList<HeroSlide>>(null);
   // ScrollView ref for the horizontal feature page slider
-  const featScrollRef = useRef<ScrollView>(null);
+  const featScrollRef = useRef<ComponentRef<typeof Animated.ScrollView>>(null);
   const heroIdxRef = useRef(0);
   const [heroIdx, setHeroIdx] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
@@ -223,6 +256,10 @@ export default function LandingScreen() {
   const isTablet = screenWidth >= 768;
 
   const cols = getColumns(screenWidth);
+  const maxRowsPerPage = Math.max(
+    ...PAGES.map((page) => Math.ceil(page.items.length / cols)),
+  );
+  const usesDenseGrid = maxRowsPerPage > 3;
 
   // Horizontal padding & gap — fixed px, no scale() inflation
   const GRID_GAP = isDesktop ? 8 : 8;
@@ -239,7 +276,17 @@ export default function LandingScreen() {
   const heroW = contentW - HERO_H_PAD * 2;
 
   // Card height — fixed pixel values, no verticalScale inflation
-  const CARD_H = isDesktop ? 72 : isTablet ? 76 : 80;
+  const CARD_H = usesDenseGrid
+    ? isDesktop
+      ? 68
+      : isTablet
+        ? 72
+        : 74
+    : isDesktop
+      ? 72
+      : isTablet
+        ? 76
+        : 80;
 
   // Icon circle & icon size
   const iconCircleSize = isDesktop ? 32 : isTablet ? 36 : 40;
@@ -445,7 +492,7 @@ export default function LandingScreen() {
             }}
             onScroll={onFeatScroll}
             pagingEnabled
-            ref={featScrollRef as Ref<ScrollView>}
+            ref={featScrollRef}
             scrollEventThrottle={16}
             showsHorizontalScrollIndicator={false}
           >

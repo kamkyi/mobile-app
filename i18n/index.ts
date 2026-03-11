@@ -12,6 +12,12 @@ export const SUPPORTED_LANGUAGES = ["en", "my", "zh", "th"] as const;
 export type AppLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
 const FALLBACK_LANGUAGE: AppLanguage = "en";
+const APP_LANGUAGE_LOCALE_TAGS: Record<AppLanguage, string> = {
+  en: "en-US",
+  my: "my-MM",
+  th: "th-TH",
+  zh: "zh-CN",
+};
 
 function isSupportedLanguage(value: string): value is AppLanguage {
   return SUPPORTED_LANGUAGES.includes(value as AppLanguage);
@@ -34,6 +40,10 @@ export function resolveAppLanguage(value?: string): AppLanguage {
   if (!value) return FALLBACK_LANGUAGE;
   if (isSupportedLanguage(value)) return value;
   return toAppLanguage(value);
+}
+
+export function getAppLocaleTag(value?: string): string {
+  return APP_LANGUAGE_LOCALE_TAGS[resolveAppLanguage(value)];
 }
 
 async function readStoredLanguage(): Promise<AppLanguage | null> {
@@ -93,4 +103,3 @@ export async function setAppLanguage(language: AppLanguage): Promise<void> {
 }
 
 export default i18n;
-

@@ -1,0 +1,195 @@
+{
+  "authCallback": {
+    "backToLogin": "",
+    "completing": "",
+    "finishing": "",
+    "missingDetails": "",
+    "signInFailed": "",
+    "unableToComplete": ""
+  },
+  "common": {
+    "appName": "",
+    "back": "",
+    "goBack": "",
+    "login": "",
+    "menu": ""
+  },
+  "drawer": {
+    "closeMenuA11y": "",
+    "locale": "",
+    "logOut": "",
+    "logOutA11y": "",
+    "memberSince": "",
+    "nav": {
+      "explore": "",
+      "home": "",
+      "notifications": "",
+      "settings": ""
+    },
+    "navigation": "",
+    "verified": ""
+  },
+  "feature": {
+    "carRental": {
+      "allBrands": "",
+      "allThailand": "",
+      "availableCarsSubtitle": "",
+      "availableCarsTitle": "",
+      "availableRange": "",
+      "bookCarA11y": "",
+      "bookNow": "",
+      "brandLabel": "",
+      "filtersTitle": "",
+      "heroCount_one": "",
+      "heroCount_other": "",
+      "heroSubtitle": "",
+      "heroTag": "",
+      "heroTitle": "",
+      "invalidDateHint": "",
+      "locationLabel": "",
+      "noResultsBody": "",
+      "noResultsTitle": "",
+      "perDay": "",
+      "pickupDateA11y": "",
+      "pickupDateLabel": "",
+      "pickupDatePlaceholder": "",
+      "priceFilters": {
+        "any": "",
+        "upTo1200": "",
+        "upTo1800": "",
+        "upTo2500": ""
+      },
+      "pricePerDayLabel": "",
+      "resetAll": "",
+      "resetFilters": "",
+      "seats_one": "",
+      "seats_other": "",
+      "trips_one": "",
+      "trips_other": "",
+      "validDateHint": ""
+    },
+    "defaultTitle": "",
+    "flow": {
+      "activePhases": {
+        "fertile": "",
+        "period": "",
+        "upcoming": ""
+      },
+      "activePhaseValue": "",
+      "cycleDay": "",
+      "cycleDayValue_one": "",
+      "cycleDayValue_other": "",
+      "cycleLength": "",
+      "dateRange": "",
+      "dayCount_one": "",
+      "dayCount_other": "",
+      "fertileWindow": "",
+      "heroSubtitle": "",
+      "heroTag": "",
+      "heroTitle": "",
+      "inDays_one": "",
+      "inDays_other": "",
+      "lastPeriodStart": "",
+      "legend": {
+        "fertile": "",
+        "ovulation": "",
+        "period": "",
+        "selected": ""
+      },
+      "nextPeriod": "",
+      "note": "",
+      "ovulation": "",
+      "periodLength": "",
+      "summarySubtitle": "",
+      "summaryTitle": "",
+      "tapToUpdate": "",
+      "timelineSubtitle": "",
+      "timelineTitle": ""
+    },
+    "placeholderBody": ""
+  },
+  "features": {
+    "chips": {
+      "airport-ride": "",
+      "cleaning": "",
+      "haircut": "",
+      "massage": "",
+      "myanmar-food": "",
+      "pharmacy": "",
+      "plumber": "",
+      "tire-service": ""
+    },
+    "items": {
+      "beauty": "",
+      "car-rental": "",
+      "dating": "",
+      "delivery": "",
+      "doctor": "",
+      "fitness": "",
+      "flow": "",
+      "food": "",
+      "nearby": "",
+      "shopping": "",
+      "support": "",
+      "travel": "",
+      "visit": ""
+    }
+  },
+  "header": {
+    "logInA11y": "",
+    "openMenuA11y": ""
+  },
+  "home": {
+    "heroSlides": {
+      "hero1": {
+        "badge": "",
+        "subtitle": "",
+        "title": ""
+      },
+      "hero2": {
+        "badge": "",
+        "subtitle": "",
+        "title": ""
+      },
+      "hero3": {
+        "badge": "",
+        "subtitle": "",
+        "title": ""
+      }
+    },
+    "heroSlidesA11y": "",
+    "pages": {
+      "0": {
+        "subtitle": "",
+        "title": ""
+      },
+      "1": {
+        "subtitle": "",
+        "title": ""
+      }
+    },
+    "popularNearYou": ""
+  },
+  "language": {
+    "en": "",
+    "my": "",
+    "sectionTitle": "",
+    "th": "",
+    "zh": ""
+  },
+  "login": {
+    "continueWithWorkOS": "",
+    "noteDefault": "",
+    "noteExpoGo": "",
+    "subtitle": "",
+    "title": ""
+  },
+  "modal": {
+    "goHome": "",
+    "title": ""
+  },
+  "tabs": {
+    "explore": "",
+    "home": ""
+  }
+}

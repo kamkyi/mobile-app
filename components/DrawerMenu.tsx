@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import {
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -24,6 +25,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useDrawer } from "@/context/DrawerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import {
+  getAppLocaleTag,
   resolveAppLanguage,
   setAppLanguage,
   SUPPORTED_LANGUAGES,
@@ -237,6 +239,20 @@ function usePalette(colorScheme: "light" | "dark"): ColorPalette {
 
 const DRAWER_WIDTH_FRACTION = 0.8;
 const SPRING_CONFIG = { damping: 22, stiffness: 200, mass: 1 };
+const LANGUAGE_CODE_LABELS: Record<AppLanguage, string> = {
+  en: "EN",
+  my: "MY",
+  th: "TH",
+  zh: "ZH",
+};
+
+/*
+ * Extraction hints for i18next-parser.
+ * t('language.en')
+ * t('language.my')
+ * t('language.zh')
+ * t('language.th')
+ */
 
 export default function DrawerMenu() {
   const { isOpen, close } = useDrawer();
@@ -352,222 +368,235 @@ export default function DrawerMenu() {
           {
             width: drawerWidth,
             backgroundColor: palette.bg,
-            paddingBottom: insets.bottom + 16,
           },
         ]}
       >
-        {/* ── Header / Profile Banner ───────────────────── */}
-        <View
-          style={[
-            styles.profileHeader,
-            {
-              paddingTop: insets.top + 20,
-              backgroundColor: palette.headerGradientStart,
-            },
+        <ScrollView
+          bounces={false}
+          contentContainerStyle={[
+            styles.panelScrollContent,
+            { paddingBottom: insets.bottom + 16 },
           ]}
+          showsVerticalScrollIndicator={false}
+          style={styles.panelScroll}
         >
-          {/* Close Button */}
-          <Pressable
-            onPress={close}
-            style={styles.closeBtn}
-            hitSlop={12}
-            accessibilityLabel={t("drawer.closeMenuA11y")}
+          {/* ── Header / Profile Banner ───────────────────── */}
+          <View
+            style={[
+              styles.profileHeader,
+              {
+                paddingTop: insets.top + 20,
+                backgroundColor: palette.headerGradientStart,
+              },
+            ]}
           >
-            <Ionicons name="close" size={22} color="rgba(255,255,255,0.85)" />
-          </Pressable>
+            {/* Close Button */}
+            <Pressable
+              onPress={close}
+              style={styles.closeBtn}
+              hitSlop={12}
+              accessibilityLabel={t("drawer.closeMenuA11y")}
+            >
+              <Ionicons
+                name="close"
+                size={22}
+                color="rgba(255,255,255,0.85)"
+              />
+            </Pressable>
 
-          {/* Avatar */}
-          <Avatar
-            uri={user?.profilePictureUrl}
-            name={user?.name ?? "User"}
-            size={72}
-            palette={palette}
-          />
+            {/* Avatar */}
+            <Avatar
+              uri={user?.profilePictureUrl}
+              name={user?.name ?? "User"}
+              size={72}
+              palette={palette}
+            />
 
-          {/* Name */}
-          <Text style={styles.profileName} numberOfLines={1}>
-            {user?.name ?? t("common.appName")}
-          </Text>
-
-          {/* Email + verified badge */}
-          <View style={styles.emailRow}>
-            <Text style={styles.profileEmail} numberOfLines={1}>
-              {user?.email ?? ""}
+            {/* Name */}
+            <Text style={styles.profileName} numberOfLines={1}>
+              {user?.name ?? t("common.appName")}
             </Text>
-            {user?.emailVerified && (
-              <View
-                style={[
-                  styles.verifiedBadge,
-                  { backgroundColor: "rgba(74,222,128,0.2)" },
-                ]}
-              >
-                <Ionicons name="checkmark-circle" size={12} color="#4ADE80" />
-                <Text style={styles.verifiedText}>{t("drawer.verified")}</Text>
+
+            {/* Email + verified badge */}
+            <View style={styles.emailRow}>
+              <Text style={styles.profileEmail} numberOfLines={1}>
+                {user?.email ?? ""}
+              </Text>
+              {user?.emailVerified && (
+                <View
+                  style={[
+                    styles.verifiedBadge,
+                    { backgroundColor: "rgba(74,222,128,0.2)" },
+                  ]}
+                >
+                  <Ionicons name="checkmark-circle" size={12} color="#4ADE80" />
+                  <Text style={styles.verifiedText}>{t("drawer.verified")}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Auth method chip */}
+            {user?.authenticationMethod && (
+              <View style={styles.authMethodChip}>
+                <Ionicons
+                  name={getAuthMethodIcon(user.authenticationMethod)}
+                  size={13}
+                  color="rgba(255,255,255,0.8)"
+                />
+                <Text style={styles.authMethodText}>
+                  {formatAuthMethod(user.authenticationMethod)}
+                </Text>
               </View>
             )}
           </View>
 
-          {/* Auth method chip */}
-          {user?.authenticationMethod && (
-            <View style={styles.authMethodChip}>
-              <Ionicons
-                name={getAuthMethodIcon(user.authenticationMethod)}
-                size={13}
-                color="rgba(255,255,255,0.8)"
-              />
-              <Text style={styles.authMethodText}>
-                {formatAuthMethod(user.authenticationMethod)}
-              </Text>
-            </View>
-          )}
-        </View>
+          {/* ── User Info Card ────────────────────────────── */}
+          <View
+            style={[
+              styles.infoCard,
+              { backgroundColor: palette.surface, borderColor: palette.divider },
+            ]}
+          >
+            {user?.locale && (
+              <View style={styles.infoRow}>
+                <Ionicons
+                  name="globe-outline"
+                  size={15}
+                  color={palette.subtext}
+                />
+                <Text style={[styles.infoLabel, { color: palette.subtext }]}>
+                  {t("drawer.locale")}
+                </Text>
+                <Text style={[styles.infoValue, { color: palette.text }]}>
+                  {user.locale}
+                </Text>
+              </View>
+            )}
+            {user?.createdAt && (
+              <View style={styles.infoRow}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={15}
+                  color={palette.subtext}
+                />
+                <Text style={[styles.infoLabel, { color: palette.subtext }]}>
+                  {t("drawer.memberSince")}
+                </Text>
+                <Text style={[styles.infoValue, { color: palette.text }]}>
+                  {formatDate(
+                    user.createdAt,
+                    getAppLocaleTag(i18n.resolvedLanguage ?? i18n.language),
+                  )}
+                </Text>
+              </View>
+            )}
+          </View>
 
-        {/* ── User Info Card ────────────────────────────── */}
-        <View
-          style={[
-            styles.infoCard,
-            { backgroundColor: palette.surface, borderColor: palette.divider },
-          ]}
-        >
-          {user?.locale && (
-            <View style={styles.infoRow}>
-              <Ionicons
-                name="globe-outline"
-                size={15}
-                color={palette.subtext}
-              />
-              <Text style={[styles.infoLabel, { color: palette.subtext }]}>
-                {t("drawer.locale")}
-              </Text>
-              <Text style={[styles.infoValue, { color: palette.text }]}>
-                {user.locale}
-              </Text>
-            </View>
-          )}
-          {user?.createdAt && (
-            <View style={styles.infoRow}>
-              <Ionicons
-                name="calendar-outline"
-                size={15}
-                color={palette.subtext}
-              />
-              <Text style={[styles.infoLabel, { color: palette.subtext }]}>
-                {t("drawer.memberSince")}
-              </Text>
-              <Text style={[styles.infoValue, { color: palette.text }]}>
-                {formatDate(user.createdAt, i18n.resolvedLanguage ?? "en")}
-              </Text>
-            </View>
-          )}
-        </View>
+          <View
+            style={[
+              styles.languageCard,
+              { backgroundColor: palette.surface, borderColor: palette.divider },
+            ]}
+          >
+            <Text
+              style={[
+                styles.sectionLabel,
+                styles.languageLabel,
+                { color: palette.subtext },
+              ]}
+            >
+              {t("language.sectionTitle").toUpperCase()}
+            </Text>
+            <View style={styles.languageOptions}>
+              {SUPPORTED_LANGUAGES.map((language) => {
+                const selected = activeLanguage === language;
+                const languageName = t(`language.${language}`);
 
-        <View
-          style={[
-            styles.languageCard,
-            { backgroundColor: palette.surface, borderColor: palette.divider },
-          ]}
-        >
-          <Text style={[styles.sectionLabel, styles.languageLabel, { color: palette.subtext }]}>
-            {t("language.sectionTitle").toUpperCase()}
-          </Text>
-          <View style={styles.languageOptions}>
-            {SUPPORTED_LANGUAGES.map((language) => {
-              const selected = activeLanguage === language;
-              const languageName = t(`language.${language}`);
-              const shortKey =
-                language === "en"
-                  ? "shortEn"
-                  : language === "my"
-                    ? "shortMy"
-                    : language === "zh"
-                      ? "shortZh"
-                      : "shortTh";
-
-              return (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={languageName}
-                  key={language}
-                  onPress={() => handleLanguagePress(language)}
-                  style={({ pressed }) => [
-                    styles.languageChip,
-                    {
-                      backgroundColor: selected
-                        ? "rgba(59,130,246,0.15)"
-                        : "rgba(148,163,184,0.1)",
-                      borderColor: selected
-                        ? "rgba(59,130,246,0.5)"
-                        : "rgba(148,163,184,0.3)",
-                    },
-                    pressed && { opacity: 0.7 },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.languageChipText,
-                      { color: selected ? palette.accent : palette.text },
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={languageName}
+                    key={language}
+                    onPress={() => handleLanguagePress(language)}
+                    style={({ pressed }) => [
+                      styles.languageChip,
+                      {
+                        backgroundColor: selected
+                          ? "rgba(59,130,246,0.15)"
+                          : "rgba(148,163,184,0.1)",
+                        borderColor: selected
+                          ? "rgba(59,130,246,0.5)"
+                          : "rgba(148,163,184,0.3)",
+                      },
+                      pressed && { opacity: 0.7 },
                     ]}
                   >
-                    {t(`language.${shortKey}`)}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* ── Divider ───────────────────────────────────── */}
-        <View style={[styles.divider, { backgroundColor: palette.divider }]} />
-
-        {/* ── Navigation ────────────────────────────────── */}
-        <View style={styles.navSection}>
-          <Text style={[styles.sectionLabel, { color: palette.subtext }]}>
-            {t("drawer.navigation").toUpperCase()}
-          </Text>
-          {navItems.map((item) => (
-            <NavRow
-              key={item.key}
-              item={item}
-              onPress={() => handleNavPress(item)}
-              active={false}
-              palette={palette}
-            />
-          ))}
-        </View>
-
-        {/* ── Spacer ────────────────────────────────────── */}
-        <View style={{ flex: 1 }} />
-
-        {/* ── Divider ───────────────────────────────────── */}
-        <View style={[styles.divider, { backgroundColor: palette.divider }]} />
-
-        {/* ── Footer ────────────────────────────────────── */}
-        <View style={styles.footer}>
-          <Pressable
-            onPress={handleLogout}
-            style={({ pressed }) => [
-              styles.logoutBtn,
-              pressed && { opacity: 0.75 },
-            ]}
-            accessibilityLabel={t("drawer.logOutA11y")}
-            accessibilityRole="button"
-          >
-            <View style={styles.logoutIconWrap}>
-              <Ionicons name="log-out-outline" size={18} color="#EF4444" />
+                    <Text
+                      style={[
+                        styles.languageChipText,
+                        { color: selected ? palette.accent : palette.text },
+                      ]}
+                    >
+                      {LANGUAGE_CODE_LABELS[language]}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
-            <Text style={styles.logoutLabel}>{t("drawer.logOut")}</Text>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color="#EF4444"
-              style={{ marginLeft: "auto" }}
-            />
-          </Pressable>
+          </View>
 
-          <Text style={[styles.footerVersion, { color: palette.subtext }]}>
-            {t("common.appName")} · v1.0.0
-          </Text>
-        </View>
+          {/* ── Divider ───────────────────────────────────── */}
+          <View style={[styles.divider, { backgroundColor: palette.divider }]} />
+
+          {/* ── Navigation ────────────────────────────────── */}
+          <View style={styles.navSection}>
+            <Text style={[styles.sectionLabel, { color: palette.subtext }]}>
+              {t("drawer.navigation").toUpperCase()}
+            </Text>
+            {navItems.map((item) => (
+              <NavRow
+                key={item.key}
+                item={item}
+                onPress={() => handleNavPress(item)}
+                active={false}
+                palette={palette}
+              />
+            ))}
+          </View>
+
+          <View style={styles.panelSpacer} />
+
+          {/* ── Divider ───────────────────────────────────── */}
+          <View style={[styles.divider, { backgroundColor: palette.divider }]} />
+
+          {/* ── Footer ────────────────────────────────────── */}
+          <View style={styles.footer}>
+            <Pressable
+              onPress={handleLogout}
+              style={({ pressed }) => [
+                styles.logoutBtn,
+                pressed && { opacity: 0.75 },
+              ]}
+              accessibilityLabel={t("drawer.logOutA11y")}
+              accessibilityRole="button"
+            >
+              <View style={styles.logoutIconWrap}>
+                <Ionicons name="log-out-outline" size={18} color="#EF4444" />
+              </View>
+              <Text style={styles.logoutLabel}>{t("drawer.logOut")}</Text>
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color="#EF4444"
+                style={{ marginLeft: "auto" }}
+              />
+            </Pressable>
+
+            <Text style={[styles.footerVersion, { color: palette.subtext }]}>
+              {t("common.appName")} · v1.0.0
+            </Text>
+          </View>
+        </ScrollView>
       </Animated.View>
     </Modal>
   );
@@ -591,6 +620,12 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 24,
     overflow: "hidden",
+  },
+  panelScroll: {
+    flex: 1,
+  },
+  panelScrollContent: {
+    flexGrow: 1,
   },
 
   // ── Profile header
@@ -718,10 +753,11 @@ const styles = StyleSheet.create({
   },
   languageChip: {
     minWidth: 56,
+    minHeight: 36,
     borderRadius: 999,
     borderWidth: 1,
     paddingHorizontal: 11,
-    paddingVertical: 7,
+    paddingVertical: 0,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -729,6 +765,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 0.2,
+    lineHeight: 14,
+    textAlign: "center",
   },
 
   // ── Divider
@@ -742,6 +780,10 @@ const styles = StyleSheet.create({
   navSection: {
     paddingHorizontal: 14,
     gap: 2,
+  },
+  panelSpacer: {
+    flex: 1,
+    minHeight: 16,
   },
   sectionLabel: {
     fontSize: 11,
