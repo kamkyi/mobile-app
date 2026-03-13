@@ -39,6 +39,12 @@
           }
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Links to access your photo library so you can choose a professional profile image."
+        }
+      ],
       "expo-sqlite"
     ],
     "experiments": {

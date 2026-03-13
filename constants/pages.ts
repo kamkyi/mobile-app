@@ -27,7 +27,7 @@ export type FeaturePage = {
 export const PAGES: FeaturePage[] = [
   {
     title: "Essentials",
-    subtitle: "Everything you need for everyday city life",
+    subtitle: "",
     items: [
       {
         key: "car-rental",

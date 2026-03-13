@@ -21,7 +21,12 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import {
+  PROFESSIONAL_ROLE_OPTIONS,
+  normalizeProfessionalRoles,
+} from "@/constants/professional";
 import { useAuth } from "@/context/AuthContext";
+import { useAppData } from "@/context/AppDataContext";
 import { useDrawer } from "@/context/DrawerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import {
@@ -257,6 +262,7 @@ const LANGUAGE_CODE_LABELS: Record<AppLanguage, string> = {
 export default function DrawerMenu() {
   const { isOpen, close } = useDrawer();
   const { user, logout } = useAuth();
+  const { currentProfessionalProfile } = useAppData();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
@@ -335,6 +341,22 @@ export default function DrawerMenu() {
 
   const handleLanguagePress = (language: AppLanguage) => {
     void setAppLanguage(language);
+  };
+
+  const professionalRoles = normalizeProfessionalRoles(
+    currentProfessionalProfile?.roles ?? [],
+  );
+  const hasProfessionalProfile = professionalRoles.length > 0;
+  const professionalSummary = professionalRoles
+    .map((roleKey) => {
+      const option = PROFESSIONAL_ROLE_OPTIONS.find((item) => item.key === roleKey);
+      return option ? t(option.titleKey) : roleKey;
+    })
+    .join(" • ");
+
+  const handleProfessionalPress = () => {
+    close();
+    setTimeout(() => router.push("/professional"), 250);
   };
 
   if (!modalVisible) return null;
@@ -543,6 +565,57 @@ export default function DrawerMenu() {
                 );
               })}
             </View>
+          </View>
+
+          <View
+            style={[
+              styles.professionalCard,
+              { backgroundColor: palette.surface, borderColor: palette.divider },
+            ]}
+          >
+            <View style={styles.professionalHeader}>
+              <View
+                style={[
+                  styles.professionalIconWrap,
+                  { backgroundColor: "rgba(59,130,246,0.14)" },
+                ]}
+              >
+                <Ionicons color={palette.accent} name="sparkles-outline" size={18} />
+              </View>
+              <View style={styles.professionalCopy}>
+                <Text style={[styles.professionalTitle, { color: palette.text }]}>
+                  {hasProfessionalProfile
+                    ? t("drawer.professionalReady")
+                    : t("drawer.becomeProfessional")}
+                </Text>
+                <Text
+                  numberOfLines={2}
+                  style={[styles.professionalBody, { color: palette.subtext }]}
+                >
+                  {hasProfessionalProfile
+                    ? professionalSummary
+                    : t("drawer.professionalHint")}
+                </Text>
+              </View>
+            </View>
+
+            <Pressable
+              accessibilityLabel={t("drawer.becomeProfessional")}
+              accessibilityRole="button"
+              onPress={handleProfessionalPress}
+              style={({ pressed }) => [
+                styles.professionalButton,
+                { backgroundColor: palette.accent },
+                pressed && { opacity: 0.86 },
+              ]}
+            >
+              <Text style={styles.professionalButtonText}>
+                {hasProfessionalProfile
+                  ? t("drawer.editProfessional")
+                  : t("drawer.becomeProfessional")}
+              </Text>
+              <Ionicons color="#FFFFFF" name="chevron-forward" size={18} />
+            </Pressable>
           </View>
 
           {/* ── Divider ───────────────────────────────────── */}
@@ -767,6 +840,54 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
     lineHeight: 14,
     textAlign: "center",
+  },
+  professionalCard: {
+    marginHorizontal: 14,
+    marginTop: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    gap: 14,
+  },
+  professionalHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  professionalIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  professionalCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  professionalTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    lineHeight: 20,
+  },
+  professionalBody: {
+    fontSize: 12.5,
+    lineHeight: 18,
+  },
+  professionalButton: {
+    minHeight: 44,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  professionalButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+    letterSpacing: 0.2,
   },
 
   // ── Divider

@@ -1,13 +1,15 @@
 import { openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
 
 import type {
+  SaveProfessionalProfileInput,
   SaveFlowCycleInput,
+  StoredProfessionalProfile,
   StoredFlowCycle,
   StoredUserProfile,
 } from "@/db/types";
 
 const DATABASE_NAME = "links.db";
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 
 type FlowCycleRow = {
   id: string;
@@ -32,6 +34,16 @@ type UserProfileRow = {
   updated_at: string;
 };
 
+type ProfessionalProfileRow = {
+  user_id: string;
+  roles_json: string;
+  nickname: string;
+  date_of_birth: string;
+  profile_image_uri: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 const CREATE_USER_PROFILES_TABLE = `
   CREATE TABLE IF NOT EXISTS user_profiles (
     user_id TEXT PRIMARY KEY NOT NULL,
@@ -42,6 +54,18 @@ const CREATE_USER_PROFILES_TABLE = `
     profile_picture_url TEXT,
     email_verified INTEGER NOT NULL DEFAULT 0,
     locale TEXT,
+    updated_at TEXT NOT NULL
+  );
+`;
+
+const CREATE_PROFESSIONAL_PROFILES_TABLE = `
+  CREATE TABLE IF NOT EXISTS professional_profiles (
+    user_id TEXT PRIMARY KEY NOT NULL,
+    roles_json TEXT NOT NULL,
+    nickname TEXT NOT NULL,
+    date_of_birth TEXT NOT NULL,
+    profile_image_uri TEXT,
+    created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
 `;
@@ -91,6 +115,29 @@ function mapUserProfileRow(row: UserProfileRow): StoredUserProfile {
   };
 }
 
+function mapProfessionalProfileRow(
+  row: ProfessionalProfileRow,
+): StoredProfessionalProfile {
+  let roles: string[] = [];
+
+  try {
+    const parsed = JSON.parse(row.roles_json);
+    roles = Array.isArray(parsed) ? parsed.filter((value) => typeof value === "string") : [];
+  } catch {
+    roles = [];
+  }
+
+  return {
+    userId: row.user_id,
+    roles,
+    nickname: row.nickname,
+    dateOfBirth: row.date_of_birth,
+    profileImageUri: row.profile_image_uri ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 let dbPromise: Promise<SQLiteDatabase> | null = null;
 
 async function getDatabase() {
@@ -99,6 +146,7 @@ async function getDatabase() {
       const db = await openDatabaseAsync(DATABASE_NAME);
       await db.execAsync("PRAGMA journal_mode = WAL;");
       await db.execAsync(CREATE_USER_PROFILES_TABLE);
+      await db.execAsync(CREATE_PROFESSIONAL_PROFILES_TABLE);
       await db.execAsync(CREATE_FLOW_CYCLES_TABLE);
       await db.execAsync(CREATE_FLOW_CYCLES_INDEX);
       await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION};`);
@@ -248,4 +296,74 @@ export async function getUserProfile(userId: string) {
   );
 
   return row ? mapUserProfileRow(row) : null;
+}
+
+export async function getProfessionalProfile(userId: string) {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<ProfessionalProfileRow>(
+    `
+      SELECT
+        user_id,
+        roles_json,
+        nickname,
+        date_of_birth,
+        profile_image_uri,
+        created_at,
+        updated_at
+      FROM professional_profiles
+      WHERE user_id = ?
+      LIMIT 1
+    `,
+    userId,
+  );
+
+  return row ? mapProfessionalProfileRow(row) : null;
+}
+
+export async function saveProfessionalProfile(input: SaveProfessionalProfileInput) {
+  const db = await getDatabase();
+  const now = new Date().toISOString();
+  const existing = await db.getFirstAsync<{ created_at: string }>(
+    "SELECT created_at FROM professional_profiles WHERE user_id = ?",
+    input.userId,
+  );
+  const createdAt = existing?.created_at ?? now;
+  const rolesJson = JSON.stringify(input.roles);
+
+  await db.runAsync(
+    `
+      INSERT INTO professional_profiles (
+        user_id,
+        roles_json,
+        nickname,
+        date_of_birth,
+        profile_image_uri,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(user_id) DO UPDATE SET
+        roles_json = excluded.roles_json,
+        nickname = excluded.nickname,
+        date_of_birth = excluded.date_of_birth,
+        profile_image_uri = excluded.profile_image_uri,
+        updated_at = excluded.updated_at
+    `,
+    input.userId,
+    rolesJson,
+    input.nickname,
+    input.dateOfBirth,
+    input.profileImageUri ?? null,
+    createdAt,
+    now,
+  );
+
+  return {
+    userId: input.userId,
+    roles: [...input.roles],
+    nickname: input.nickname,
+    dateOfBirth: input.dateOfBirth,
+    profileImageUri: input.profileImageUri,
+    createdAt,
+    updatedAt: now,
+  };
 }

@@ -32,6 +32,11 @@ export const resources = {
         verified: "Verified",
         locale: "Locale",
         memberSince: "Member since",
+        becomeProfessional: "+ Become a professional",
+        professionalHint:
+          "Open your service profile and tell people what you do best.",
+        professionalReady: "Professional profile ready",
+        editProfessional: "Edit professional profile",
         navigation: "Navigation",
         logOut: "Log Out",
         logOutA11y: "Log out",
@@ -81,12 +86,12 @@ export const resources = {
         },
         pages: {
           "0": {
-            title: "Essentials",
-            subtitle: "Everything you need for everyday city life",
+            title: "",
+            subtitle: "",
           },
           "1": {
-            title: "Services",
-            subtitle: "Book trusted services in a few taps",
+            title: "",
+            subtitle: "",
           },
         },
         popularNearYou: "Popular Near You",
@@ -212,6 +217,90 @@ export const resources = {
             "This tracker is informational only and should not replace medical advice.",
         },
       },
+      professional: {
+        roleScreenTitle: "Choose roles",
+        profileScreenTitle: "Create profile",
+        roleEyebrow: "Professional onboarding",
+        roleTitle: "What kind of professional are you?",
+        roleSubtitle:
+          "Pick up to three specialties so customers can understand your profile at a glance.",
+        selectionCount: "{{count}} of {{max}} selected",
+        selectionHint: "You can choose up to 3 roles.",
+        selectionLimitReached: "Maximum reached. Remove one role to choose another.",
+        nextAction: "Next",
+        profileEyebrow: "Professional details",
+        profileTitle: "Finish your professional profile",
+        profileSubtitle:
+          "Add a photo, your public nickname, and your date of birth. This profile stays saved on this device.",
+        photoLabel: "Profile image",
+        photoHint: "Choose a square photo that feels clear and trustworthy.",
+        pickPhoto: "Choose photo",
+        changePhoto: "Change photo",
+        removePhoto: "Remove photo",
+        photoPermissionTitle: "Photo access needed",
+        photoPermissionBody:
+          "Allow Links to access your photo library so you can pick a professional profile image.",
+        nicknameLabel: "Nickname",
+        nicknamePlaceholder: "How should people know you?",
+        nicknameRequired: "Please enter a nickname.",
+        dobLabel: "Date of birth",
+        dobPlaceholder: "YYYY-MM-DD",
+        dobHint: "Use the format YYYY-MM-DD.",
+        dobInvalid: "Enter a valid past date in YYYY-MM-DD format.",
+        saveAction: "Save professional profile",
+        saveErrorTitle: "Could not save profile",
+        saveErrorBody: "Please try again.",
+        roles: {
+          doctor: {
+            title: "Doctor",
+            description: "Medical consultations, wellness guidance, and patient care.",
+          },
+          technician: {
+            title: "Technician",
+            description: "Repairs, installations, and practical technical support.",
+          },
+          dater: {
+            title: "Dater",
+            description: "Dating guidance, matchmaking, and relationship sessions.",
+          },
+          tutor: {
+            title: "Tutor",
+            description: "Private lessons, study coaching, and skill building.",
+          },
+          lawyer: {
+            title: "Lawyer",
+            description: "Legal advice, paperwork support, and professional counsel.",
+          },
+          chef: {
+            title: "Chef",
+            description: "Personal cooking, catering, and food experience services.",
+          },
+          designer: {
+            title: "Designer",
+            description: "Branding, graphics, digital products, and visual direction.",
+          },
+          photographer: {
+            title: "Photographer",
+            description: "Portraits, events, products, and creative visual shoots.",
+          },
+          "beauty-expert": {
+            title: "Beauty Expert",
+            description: "Makeup, skincare, styling, and appearance-focused care.",
+          },
+          "fitness-coach": {
+            title: "Fitness Coach",
+            description: "Training plans, movement coaching, and health routines.",
+          },
+          driver: {
+            title: "Driver",
+            description: "Private rides, transfers, and trusted transport support.",
+          },
+          electrician: {
+            title: "Electrician",
+            description: "Electrical fixes, wiring checks, and home service visits.",
+          },
+        },
+      },
       modal: {
         title: "This is a modal",
         goHome: "Go to home screen",
@@ -301,12 +390,12 @@ export const resources = {
         },
         pages: {
           "0": {
-            title: "အခြေခံများ",
-            subtitle: "နေ့စဉ်မြို့ပြဘဝအတွက် လိုအပ်သမျှ",
+            title: "",
+            subtitle: "",
           },
           "1": {
-            title: "ဝန်ဆောင်မှုများ",
-            subtitle: "ယုံကြည်စိတ်ချရသောဝန်ဆောင်မှုများကို အမြန်ဘွတ်ကင်",
+            title: "",
+            subtitle: "",
           },
         },
         popularNearYou: "သင့်အနီး လူကြိုက်များ",
@@ -518,12 +607,12 @@ export const resources = {
         },
         pages: {
           "0": {
-            title: "基础服务",
-            subtitle: "城市日常所需一应俱全",
+            title: "",
+            subtitle: "",
           },
           "1": {
-            title: "专业服务",
-            subtitle: "几次点击即可预约可靠服务",
+            title: "",
+            subtitle: "",
           },
         },
         popularNearYou: "你附近的热门",
@@ -731,12 +820,12 @@ export const resources = {
         },
         pages: {
           "0": {
-            title: "บริการพื้นฐาน",
-            subtitle: "ทุกสิ่งที่ต้องใช้ในชีวิตประจำวันในเมือง",
+            title: "",
+            subtitle: "",
           },
           "1": {
-            title: "บริการต่างๆ",
-            subtitle: "จองบริการที่เชื่อถือได้ในไม่กี่แตะ",
+            title: "",
+            subtitle: "",
           },
         },
         popularNearYou: "ยอดนิยมใกล้คุณ",

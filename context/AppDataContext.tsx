@@ -8,17 +8,34 @@ import {
   type PropsWithChildren,
 } from "react";
 
+import {
+  MAX_PROFESSIONAL_ROLE_SELECTION,
+  normalizeProfessionalRoles,
+} from "@/constants/professional";
 import { type AuthUser, useAuth } from "@/context/AuthContext";
-import { getUserProfile, listFlowCyclesByUserId, saveFlowCycle, upsertUserProfile } from "@/db/storage";
+import {
+  getProfessionalProfile,
+  getUserProfile,
+  listFlowCyclesByUserId,
+  saveProfessionalProfile as persistProfessionalProfile,
+  saveFlowCycle,
+  upsertUserProfile,
+} from "@/db/storage";
 import type {
+  SaveProfessionalProfileInput,
   SaveFlowCycleInput,
+  StoredProfessionalProfile,
   StoredFlowCycle,
   StoredUserProfile,
 } from "@/db/types";
 
 type AppDataContextValue = {
   isReady: boolean;
+  currentProfessionalProfile: StoredProfessionalProfile | null;
   currentUserProfile: StoredUserProfile | null;
+  saveProfessionalProfile: (
+    input: Omit<SaveProfessionalProfileInput, "userId">,
+  ) => Promise<StoredProfessionalProfile>;
   loadFlowCycles: () => Promise<StoredFlowCycle[]>;
   saveFlowRecord: (
     input: Omit<SaveFlowCycleInput, "userId">,
@@ -44,6 +61,8 @@ function toStoredUserProfile(user: AuthUser): StoredUserProfile {
 export function AppDataProvider({ children }: PropsWithChildren) {
   const { user } = useAuth();
   const [isReady, setIsReady] = useState(false);
+  const [currentProfessionalProfile, setCurrentProfessionalProfile] =
+    useState<StoredProfessionalProfile | null>(null);
   const [currentUserProfile, setCurrentUserProfile] =
     useState<StoredUserProfile | null>(null);
 
@@ -54,6 +73,7 @@ export function AppDataProvider({ children }: PropsWithChildren) {
       try {
         if (!user) {
           if (isMounted) {
+            setCurrentProfessionalProfile(null);
             setCurrentUserProfile(null);
             setIsReady(true);
           }
@@ -62,15 +82,20 @@ export function AppDataProvider({ children }: PropsWithChildren) {
 
         const nextProfile = toStoredUserProfile(user);
         await upsertUserProfile(nextProfile);
-        const storedProfile = await getUserProfile(user.id);
+        const [storedProfile, storedProfessionalProfile] = await Promise.all([
+          getUserProfile(user.id),
+          getProfessionalProfile(user.id),
+        ]);
 
         if (isMounted) {
+          setCurrentProfessionalProfile(storedProfessionalProfile);
           setCurrentUserProfile(storedProfile ?? nextProfile);
           setIsReady(true);
         }
       } catch (error) {
         console.warn("Failed to initialize local app data", error);
         if (isMounted) {
+          setCurrentProfessionalProfile(null);
           setCurrentUserProfile(user ? toStoredUserProfile(user) : null);
           setIsReady(true);
         }
@@ -93,6 +118,27 @@ export function AppDataProvider({ children }: PropsWithChildren) {
     return listFlowCyclesByUserId(user.id);
   }, [user]);
 
+  const saveProfessionalProfile = useCallback(
+    async (input: Omit<SaveProfessionalProfileInput, "userId">) => {
+      if (!user) {
+        throw new Error("You must be logged in to save a professional profile.");
+      }
+
+      const roles = normalizeProfessionalRoles(input.roles).slice(
+        0,
+        MAX_PROFESSIONAL_ROLE_SELECTION,
+      );
+      const nextProfile = await persistProfessionalProfile({
+        ...input,
+        roles,
+        userId: user.id,
+      });
+      setCurrentProfessionalProfile(nextProfile);
+      return nextProfile;
+    },
+    [user],
+  );
+
   const saveFlowRecord = useCallback(
     async (input: Omit<SaveFlowCycleInput, "userId">) => {
       if (!user) {
@@ -110,11 +156,20 @@ export function AppDataProvider({ children }: PropsWithChildren) {
   const value = useMemo<AppDataContextValue>(
     () => ({
       isReady,
+      currentProfessionalProfile,
       currentUserProfile,
+      saveProfessionalProfile,
       loadFlowCycles,
       saveFlowRecord,
     }),
-    [currentUserProfile, isReady, loadFlowCycles, saveFlowRecord],
+    [
+      currentProfessionalProfile,
+      currentUserProfile,
+      isReady,
+      loadFlowCycles,
+      saveFlowRecord,
+      saveProfessionalProfile,
+    ],
   );
 
   return (

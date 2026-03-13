@@ -131,6 +131,14 @@ export default function RootLayout() {
                 options={{ title: t("feature.defaultTitle") }}
               />
               <Stack.Screen
+                name="professional/index"
+                options={{ title: t("professional.roleScreenTitle") }}
+              />
+              <Stack.Screen
+                name="professional/profile"
+                options={{ title: t("professional.profileScreenTitle") }}
+              />
+              <Stack.Screen
                 name="auth/callback"
                 options={{ headerShown: false }}
               />

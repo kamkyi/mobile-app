@@ -31,7 +31,12 @@ import Animated, {
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { PAGES, type FeatureItem, type PopularChip } from "@/constants/pages";
+import {
+  PAGES,
+  type FeatureItem,
+  type FeaturePage,
+  type PopularChip,
+} from "@/constants/pages";
 import { FeatureIcon } from "@/components/ui/feature-icon";
 import { useAuth } from "@/context/AuthContext";
 import { useHydratedWindowDimensions } from "@/hooks/use-hydrated-window-dimensions";
@@ -53,6 +58,38 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
   for (let i = 0; i < arr.length; i += size)
     result.push(arr.slice(i, i + size));
   return result;
+}
+
+type RenderFeaturePage = {
+  id: string;
+  sourcePageIndex: number;
+  items: FeatureItem[];
+  popularChips: PopularChip[];
+};
+
+function paginateFeaturePages(
+  pages: FeaturePage[],
+  cols: number,
+  maxRowsPerPage?: number,
+): RenderFeaturePage[] {
+  if (!maxRowsPerPage) {
+    return pages.map((page, pageIndex) => ({
+      id: `feature-page-${pageIndex}`,
+      sourcePageIndex: pageIndex,
+      items: page.items,
+      popularChips: page.popularChips,
+    }));
+  }
+
+  const itemsPerPage = Math.max(cols * maxRowsPerPage, 1);
+  return pages.flatMap((page, pageIndex) =>
+    chunkArray(page.items, itemsPerPage).map((items, sliceIndex) => ({
+      id: `feature-page-${pageIndex}-${sliceIndex}`,
+      sourcePageIndex: pageIndex,
+      items,
+      popularChips: page.popularChips,
+    })),
+  );
 }
 
 // ─── Layout constants ───────────────────────────────────────────────────────
@@ -254,16 +291,30 @@ export default function LandingScreen() {
   // ─── Responsive layout values ─────────────────────────────────────────────
   const isDesktop = screenWidth >= 1024;
   const isTablet = screenWidth >= 768;
-
   const cols = getColumns(screenWidth);
-  const maxRowsPerPage = Math.max(
-    ...PAGES.map((page) => Math.ceil(page.items.length / cols)),
+  const isSmallScreen = !isTablet;
+  const featurePages = paginateFeaturePages(
+    PAGES,
+    cols,
+    isSmallScreen ? 4 : undefined,
+  );
+  const activeFeaturePage = featurePages[currentPage] ?? featurePages[0];
+  const currentSourcePageIndex = activeFeaturePage?.sourcePageIndex ?? 0;
+  const currentPageTitle = t(`home.pages.${currentSourcePageIndex}.title`).trim();
+  const currentPageSubtitle = t(
+    `home.pages.${currentSourcePageIndex}.subtitle`,
+  ).trim();
+  const hasCurrentPageHeader =
+    currentPageTitle.length > 0 || currentPageSubtitle.length > 0;
+  const maxRowsPerPage = featurePages.reduce(
+    (maxRows, page) => Math.max(maxRows, Math.ceil(page.items.length / cols)),
+    0,
   );
   const usesDenseGrid = maxRowsPerPage > 3;
 
   // Horizontal padding & gap — fixed px, no scale() inflation
-  const GRID_GAP = isDesktop ? 8 : 8;
-  const GRID_H_PAD = isDesktop ? 12 : 10;
+  const GRID_GAP = isDesktop ? 10 : isTablet ? 9 : 8;
+  const GRID_H_PAD = isDesktop ? 14 : isTablet ? 12 : 10;
 
   // Content width — capped tightly so cards don't stretch on wide screens
   const contentW = Math.min(
@@ -276,21 +327,21 @@ export default function LandingScreen() {
   const heroW = contentW - HERO_H_PAD * 2;
 
   // Card height — fixed pixel values, no verticalScale inflation
-  const CARD_H = usesDenseGrid
-    ? isDesktop
+  const CARD_H = isDesktop
+    ? usesDenseGrid
       ? 68
-      : isTablet
+      : 74
+    : isTablet
+      ? usesDenseGrid
         ? 72
-        : 74
-    : isDesktop
-      ? 72
-      : isTablet
-        ? 76
-        : 80;
+        : 78
+      : usesDenseGrid
+        ? 72
+        : 78;
 
   // Icon circle & icon size
-  const iconCircleSize = isDesktop ? 32 : isTablet ? 36 : 40;
-  const iconSize = isDesktop ? 15 : isTablet ? 17 : 19;
+  const iconCircleSize = isDesktop ? 32 : isTablet ? 36 : usesDenseGrid ? 38 : 40;
+  const iconSize = isDesktop ? 15 : isTablet ? 17 : usesDenseGrid ? 18 : 19;
 
   // Card width fills the row minus padding and gaps
   const cardW = (contentW - GRID_H_PAD * 2 - GRID_GAP * (cols - 1)) / cols;
@@ -302,6 +353,18 @@ export default function LandingScreen() {
 
   // Hero font
   const heroFs = isDesktop ? 20 : isTablet ? 21 : screenWidth >= 414 ? 20 : 18;
+
+  useEffect(() => {
+    if (featurePages.length === 0) return;
+
+    const nextPage = Math.min(currentPage, featurePages.length - 1);
+    if (nextPage !== currentPage) {
+      setCurrentPage(nextPage);
+      return;
+    }
+
+    featScrollRef.current?.scrollTo({ x: contentW * nextPage, animated: false });
+  }, [contentW, currentPage, featurePages.length]);
 
   // ─── Hero autoplay ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -323,10 +386,11 @@ export default function LandingScreen() {
 
   const goPage = useCallback(
     (idx: number) => {
-      featScrollRef.current?.scrollTo({ x: contentW * idx, animated: true });
-      setCurrentPage(idx);
+      const nextPage = Math.max(0, Math.min(idx, featurePages.length - 1));
+      featScrollRef.current?.scrollTo({ x: contentW * nextPage, animated: true });
+      setCurrentPage(nextPage);
     },
-    [contentW],
+    [contentW, featurePages.length],
   );
 
   const onFeatScroll = useAnimatedScrollHandler((e) => {
@@ -462,15 +526,17 @@ export default function LandingScreen() {
         <View
           style={[styles.sectionCard, styles.featureFlex, { width: contentW }]}
         >
-          {/* Title/subtitle reflects the active page */}
-          <View style={styles.sectionHead}>
-            <Text style={styles.sectionTitle}>
-              {t(`home.pages.${currentPage}.title`)}
-            </Text>
-            <Text style={styles.sectionSub}>
-              {t(`home.pages.${currentPage}.subtitle`)}
-            </Text>
-          </View>
+          {/* Hide the header entirely when the active page has no copy. */}
+          {hasCurrentPageHeader ? (
+            <View style={styles.sectionHead}>
+              {currentPageTitle ? (
+                <Text style={styles.sectionTitle}>{currentPageTitle}</Text>
+              ) : null}
+              {currentPageSubtitle ? (
+                <Text style={styles.sectionSub}>{currentPageSubtitle}</Text>
+              ) : null}
+            </View>
+          ) : null}
 
           {/*
            * Horizontal paging ScrollView — NO nested FlatList,
@@ -485,7 +551,7 @@ export default function LandingScreen() {
                 0,
                 Math.min(
                   Math.round(e.nativeEvent.contentOffset.x / contentW),
-                  PAGES.length - 1,
+                  featurePages.length - 1,
                 ),
               );
               setCurrentPage(p);
@@ -496,11 +562,11 @@ export default function LandingScreen() {
             scrollEventThrottle={16}
             showsHorizontalScrollIndicator={false}
           >
-            {PAGES.map((page) => {
+            {featurePages.map((page) => {
               const rows = chunkArray(page.items, cols);
               return (
                 <View
-                  key={page.title}
+                  key={page.id}
                   style={{
                     width: contentW,
                     paddingHorizontal: GRID_H_PAD,
@@ -542,7 +608,7 @@ export default function LandingScreen() {
 
           {/* Page dots */}
           <View style={styles.pageDots}>
-            {PAGES.map((_, i) => (
+            {featurePages.map((_, i) => (
               <Pressable
                 hitSlop={10}
                 key={`pd-${i}`}
@@ -563,7 +629,7 @@ export default function LandingScreen() {
             horizontal
             showsHorizontalScrollIndicator={false}
           >
-            {PAGES[currentPage]?.popularChips.map((chip) => (
+            {activeFeaturePage?.popularChips.map((chip) => (
               <Pressable
                 accessibilityLabel={getChipLabel(chip.key)}
                 accessibilityRole="button"
@@ -712,11 +778,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#F8FAFC",
     borderColor: "rgba(100,130,250,0.1)",
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 1,
     flex: 1,
     justifyContent: "center",
-    rowGap: 5,
+    paddingHorizontal: 4,
+    paddingVertical: 8,
+    rowGap: 6,
     ...Platform.select({
       ios: {
         shadowColor: "#162050",
@@ -739,6 +807,7 @@ const styles = StyleSheet.create({
     color: "#111827",
     fontSize: 10,
     fontWeight: "700",
+    lineHeight: 12,
     paddingHorizontal: 3,
     textAlign: "center",
   },

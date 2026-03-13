@@ -1,5 +1,7 @@
 import type {
+  SaveProfessionalProfileInput,
   SaveFlowCycleInput,
+  StoredProfessionalProfile,
   StoredFlowCycle,
   StoredUserProfile,
 } from "@/db/types";
@@ -8,12 +10,14 @@ const LOCAL_STORAGE_KEY = "app.db.v1";
 
 type PersistedState = {
   flowCycles: StoredFlowCycle[];
+  professionalProfiles: StoredProfessionalProfile[];
   userProfiles: StoredUserProfile[];
 };
 
 function createEmptyState(): PersistedState {
   return {
     flowCycles: [],
+    professionalProfiles: [],
     userProfiles: [],
   };
 }
@@ -27,6 +31,9 @@ function sanitizeState(value: unknown): PersistedState {
 
   return {
     flowCycles: Array.isArray(parsed.flowCycles) ? parsed.flowCycles : [],
+    professionalProfiles: Array.isArray(parsed.professionalProfiles)
+      ? parsed.professionalProfiles
+      : [],
     userProfiles: Array.isArray(parsed.userProfiles) ? parsed.userProfiles : [],
   };
 }
@@ -124,4 +131,39 @@ export async function upsertUserProfile(profile: StoredUserProfile) {
 export async function getUserProfile(userId: string) {
   ensureInitialized();
   return state.userProfiles.find((item) => item.userId === userId) ?? null;
+}
+
+export async function getProfessionalProfile(userId: string) {
+  ensureInitialized();
+  return state.professionalProfiles.find((item) => item.userId === userId) ?? null;
+}
+
+export async function saveProfessionalProfile(input: SaveProfessionalProfileInput) {
+  ensureInitialized();
+
+  const now = new Date().toISOString();
+  const existingIndex = state.professionalProfiles.findIndex(
+    (item) => item.userId === input.userId,
+  );
+  const existing =
+    existingIndex >= 0 ? state.professionalProfiles[existingIndex] : undefined;
+
+  const nextProfile: StoredProfessionalProfile = {
+    userId: input.userId,
+    roles: [...input.roles],
+    nickname: input.nickname,
+    dateOfBirth: input.dateOfBirth,
+    profileImageUri: input.profileImageUri,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+
+  if (existingIndex >= 0) {
+    state.professionalProfiles[existingIndex] = nextProfile;
+  } else {
+    state.professionalProfiles.push(nextProfile);
+  }
+
+  persist();
+  return nextProfile;
 }

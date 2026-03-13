@@ -10,6 +10,16 @@ export type StoredUserProfile = {
   updatedAt: string;
 };
 
+export type StoredProfessionalProfile = {
+  userId: string;
+  roles: string[];
+  nickname: string;
+  dateOfBirth: string;
+  profileImageUri?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type StoredFlowCycle = {
   id: string;
   userId: string;
@@ -28,4 +38,12 @@ export type SaveFlowCycleInput = {
   endDate: string;
   cycleLength: number;
   periodLength: number;
+};
+
+export type SaveProfessionalProfileInput = {
+  userId: string;
+  roles: string[];
+  nickname: string;
+  dateOfBirth: string;
+  profileImageUri?: string;
 };
