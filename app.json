@@ -45,7 +45,8 @@
           "photosPermission": "Allow Link to access your photo library so you can choose a professional profile image."
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,

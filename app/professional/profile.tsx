@@ -1,4 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker, {
+  type DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
@@ -67,6 +70,33 @@ function isValidDateOfBirth(value: string): boolean {
   return candidate.getTime() <= Date.now();
 }
 
+function parseIsoDate(value: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+  const candidate = new Date(year, month - 1, day);
+
+  if (
+    candidate.getFullYear() !== year ||
+    candidate.getMonth() !== month - 1 ||
+    candidate.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return candidate;
+}
+
+function formatIsoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
 export default function ProfessionalProfileScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ roles?: string | string[] }>();
@@ -85,6 +115,7 @@ export default function ProfessionalProfileScreen() {
   const [selectedGenders, setSelectedGenders] = useState<ProfessionalGenderKey[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
 
   const contentWidth = Math.min(width - 28, 640);
@@ -158,6 +189,7 @@ export default function ProfessionalProfileScreen() {
   const dateOfBirthError = showErrors && !hasValidDateOfBirth;
   const serviceLocationError = showErrors && trimmedServiceLocation.length === 0;
   const genderError = showErrors && selectedGenders.length === 0;
+  const selectedDateOfBirth = parseIsoDate(dateOfBirth) ?? new Date(2000, 0, 1);
 
   const handlePickImage = async () => {
     if (Platform.OS !== "web") {
@@ -294,6 +326,21 @@ export default function ProfessionalProfileScreen() {
     } finally {
       setIsLocating(false);
     }
+  };
+
+  const handleDateChange = (
+    event: DateTimePickerEvent,
+    selectedDate?: Date,
+  ) => {
+    if (Platform.OS === "android") {
+      setShowDatePicker(false);
+    }
+
+    if (event.type !== "set" || !selectedDate) {
+      return;
+    }
+
+    setDateOfBirth(formatIsoDate(selectedDate));
   };
 
   return (
@@ -453,21 +500,55 @@ export default function ProfessionalProfileScreen() {
             </Text>
 
             <Text style={styles.fieldLabel}>{t("professional.dobLabel")}</Text>
-            <TextInput
-              accessibilityLabel={t("professional.dobLabel")}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="number-pad"
-              maxLength={10}
-              onChangeText={(value) => setDateOfBirth(formatDateOfBirthInput(value))}
-              placeholder={t("professional.dobPlaceholder")}
-              placeholderTextColor="#94A3B8"
-              style={[
-                styles.textInput,
-                dateOfBirthError ? styles.textInputError : null,
-              ]}
-              value={dateOfBirth}
-            />
+            {Platform.OS === "web" ? (
+              <TextInput
+                accessibilityLabel={t("professional.dobLabel")}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="number-pad"
+                maxLength={10}
+                onChangeText={(value) => setDateOfBirth(formatDateOfBirthInput(value))}
+                placeholder={t("professional.dobPlaceholder")}
+                placeholderTextColor="#94A3B8"
+                style={[
+                  styles.textInput,
+                  dateOfBirthError ? styles.textInputError : null,
+                ]}
+                value={dateOfBirth}
+              />
+            ) : (
+              <>
+                <Pressable
+                  accessibilityLabel={t("professional.dobLabel")}
+                  accessibilityRole="button"
+                  onPress={() => setShowDatePicker(true)}
+                  style={({ pressed }) => [
+                    styles.dateFieldButton,
+                    dateOfBirthError ? styles.textInputError : null,
+                    pressed ? styles.secondaryButtonPressed : null,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.dateFieldValue,
+                      !dateOfBirth ? styles.dateFieldPlaceholder : null,
+                    ]}
+                  >
+                    {dateOfBirth || t("professional.dobPlaceholder")}
+                  </Text>
+                  <Ionicons color="#64748B" name="calendar-outline" size={18} />
+                </Pressable>
+                {showDatePicker ? (
+                  <DateTimePicker
+                    display={Platform.OS === "ios" ? "inline" : "default"}
+                    maximumDate={new Date()}
+                    mode="date"
+                    onChange={handleDateChange}
+                    value={selectedDateOfBirth}
+                  />
+                ) : null}
+              </>
+            )}
             <Text
               style={[styles.fieldHint, dateOfBirthError ? styles.errorText : null]}
             >
@@ -771,6 +852,27 @@ const styles = StyleSheet.create({
     color: "#1D4ED8",
     fontSize: 13,
     fontWeight: "700",
+  },
+  dateFieldButton: {
+    minHeight: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#D7DFEB",
+    backgroundColor: "#F8FAFC",
+    marginTop: 10,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  dateFieldValue: {
+    color: "#111827",
+    fontSize: 14,
+    flex: 1,
+  },
+  dateFieldPlaceholder: {
+    color: "#94A3B8",
   },
   textInput: {
     minHeight: 48,

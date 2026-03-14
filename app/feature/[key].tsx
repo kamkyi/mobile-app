@@ -1,4 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker, {
+  type DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 import { LinearGradient } from "expo-linear-gradient";
 import {
   Redirect,
@@ -10,6 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -173,6 +177,33 @@ function formatIsoDate(iso: string, localeTag: string): string {
     timeZone: "UTC",
     year: "numeric",
   }).format(new Date(day * 86_400_000));
+}
+
+function parseIsoDateToLocalDate(value: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+  const candidate = new Date(year, month - 1, day);
+
+  if (
+    candidate.getFullYear() !== year ||
+    candidate.getMonth() !== month - 1 ||
+    candidate.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return candidate;
+}
+
+function formatLocalDateToIso(date: Date): string {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 }
 
 function setCalendarMark(
@@ -376,6 +407,7 @@ export default function FeatureScreen() {
   }, [params.key]);
 
   const [pickupDateInput, setPickupDateInput] = useState("");
+  const [showPickupDatePicker, setShowPickupDatePicker] = useState(false);
   const [selectedMaxPrice, setSelectedMaxPrice] = useState<number | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<
     ThaiLocation | typeof ALL_LOCATIONS
@@ -414,6 +446,7 @@ export default function FeatureScreen() {
   }, []);
 
   const pickupDate = pickupDateInput.trim();
+  const selectedPickupDate = parseIsoDateToLocalDate(pickupDateInput) ?? new Date();
   const pickupDay = useMemo(() => parseIsoDay(pickupDate), [pickupDate]);
   const isDateInvalid = pickupDate.length > 0 && pickupDay === null;
   const isCarRental = params.key === "car-rental";
@@ -481,10 +514,26 @@ export default function FeatureScreen() {
 
   const resetFilters = useCallback(() => {
     setPickupDateInput("");
+    setShowPickupDatePicker(false);
     setSelectedMaxPrice(null);
     setSelectedLocation(ALL_LOCATIONS);
     setSelectedBrand(ALL_BRANDS);
   }, []);
+
+  const handlePickupDateChange = (
+    event: DateTimePickerEvent,
+    selectedDate?: Date,
+  ) => {
+    if (Platform.OS === "android") {
+      setShowPickupDatePicker(false);
+    }
+
+    if (event.type !== "set" || !selectedDate) {
+      return;
+    }
+
+    setPickupDateInput(formatLocalDateToIso(selectedDate));
+  };
 
   const handleFlowCalendarPress = useCallback(
     (day: DateData) => {
@@ -792,20 +841,54 @@ export default function FeatureScreen() {
             <Text style={styles.filterLabel}>
               {t("feature.carRental.pickupDateLabel")}
             </Text>
-            <TextInput
-              accessibilityLabel={t("feature.carRental.pickupDateA11y")}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="numbers-and-punctuation"
-              onChangeText={setPickupDateInput}
-              placeholder={t("feature.carRental.pickupDatePlaceholder")}
-              placeholderTextColor="#94A3B8"
-              style={[
-                styles.dateInput,
-                isDateInvalid ? styles.dateInputInvalid : null,
-              ]}
-              value={pickupDateInput}
-            />
+            {Platform.OS === "web" ? (
+              <TextInput
+                accessibilityLabel={t("feature.carRental.pickupDateA11y")}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="numbers-and-punctuation"
+                onChangeText={setPickupDateInput}
+                placeholder={t("feature.carRental.pickupDatePlaceholder")}
+                placeholderTextColor="#94A3B8"
+                style={[
+                  styles.dateInput,
+                  isDateInvalid ? styles.dateInputInvalid : null,
+                ]}
+                value={pickupDateInput}
+              />
+            ) : (
+              <>
+                <Pressable
+                  accessibilityLabel={t("feature.carRental.pickupDateA11y")}
+                  accessibilityRole="button"
+                  onPress={() => setShowPickupDatePicker(true)}
+                  style={({ pressed }) => [
+                    styles.dateInput,
+                    styles.nativeDateButton,
+                    isDateInvalid ? styles.dateInputInvalid : null,
+                    pressed ? styles.filterChipPressed : null,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.nativeDateValue,
+                      !pickupDateInput ? styles.nativeDatePlaceholder : null,
+                    ]}
+                  >
+                    {pickupDateInput || t("feature.carRental.pickupDatePlaceholder")}
+                  </Text>
+                  <Ionicons color="#64748B" name="calendar-outline" size={18} />
+                </Pressable>
+                {showPickupDatePicker ? (
+                  <DateTimePicker
+                    display={Platform.OS === "ios" ? "inline" : "default"}
+                    mode="date"
+                    onChange={handlePickupDateChange}
+                    value={selectedPickupDate}
+                  />
+                ) : null}
+              </>
+            )}
             <Text
               style={[
                 styles.filterHint,
@@ -1433,6 +1516,20 @@ const styles = StyleSheet.create({
     color: Brand.textPrimary,
     fontSize: 14,
     backgroundColor: "#FFFFFF",
+  },
+  nativeDateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  nativeDateValue: {
+    color: Brand.textPrimary,
+    fontSize: 14,
+    flex: 1,
+  },
+  nativeDatePlaceholder: {
+    color: "#94A3B8",
   },
   dateInputInvalid: {
     borderColor: "#DC2626",
