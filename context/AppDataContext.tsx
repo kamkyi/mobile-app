@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import {
+  normalizeProfessionalGenders,
   MAX_PROFESSIONAL_ROLE_SELECTION,
   normalizeProfessionalRoles,
 } from "@/constants/professional";
@@ -128,8 +129,10 @@ export function AppDataProvider({ children }: PropsWithChildren) {
         0,
         MAX_PROFESSIONAL_ROLE_SELECTION,
       );
+      const genders = normalizeProfessionalGenders(input.genders);
       const nextProfile = await persistProfessionalProfile({
         ...input,
+        genders,
         roles,
         userId: user.id,
       });

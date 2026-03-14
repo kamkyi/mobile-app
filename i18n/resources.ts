@@ -2,7 +2,7 @@ export const resources = {
   en: {
     translation: {
       common: {
-        appName: "Links",
+        appName: "Link",
         back: "Back",
         login: "Login",
         menu: "Menu",
@@ -32,11 +32,11 @@ export const resources = {
         verified: "Verified",
         locale: "Locale",
         memberSince: "Member since",
-        becomeProfessional: "+ Become a professional",
+        becomeProfessional: "+ Become a Link",
         professionalHint:
           "Open your service profile and tell people what you do best.",
-        professionalReady: "Professional profile ready",
-        editProfessional: "Edit professional profile",
+        professionalReady: "Link profile ready",
+        editProfessional: "Edit Link profile",
         navigation: "Navigation",
         logOut: "Log Out",
         logOutA11y: "Log out",
@@ -49,7 +49,7 @@ export const resources = {
       },
       login: {
         title: "Welcome back",
-        subtitle: "Sign in to unlock all Links services.",
+        subtitle: "Sign in to unlock all Link services.",
         continueWithWorkOS: "Continue with WorkOS",
         noteExpoGo:
           "Expo Go uses a temporary exp:// callback. Register the exact redirect URI printed in the Metro logs or use a development build for WorkOS login.",
@@ -80,7 +80,7 @@ export const resources = {
           },
           hero3: {
             title: "Daily Essentials,\nBeautifully Simple",
-            subtitle: "One Links app for your complete city lifestyle.",
+            subtitle: "One Link app for your complete city lifestyle.",
             badge: "SMART FLOW",
           },
         },
@@ -239,7 +239,7 @@ export const resources = {
         removePhoto: "Remove photo",
         photoPermissionTitle: "Photo access needed",
         photoPermissionBody:
-          "Allow Links to access your photo library so you can pick a professional profile image.",
+          "Allow Link to access your photo library so you can pick a professional profile image.",
         nicknameLabel: "Nickname",
         nicknamePlaceholder: "How should people know you?",
         nicknameRequired: "Please enter a nickname.",
@@ -310,7 +310,7 @@ export const resources = {
   my: {
     translation: {
       common: {
-        appName: "Links",
+        appName: "Link",
         back: "နောက်သို့",
         login: "ဝင်မည်",
         menu: "မီနူး",
@@ -352,7 +352,7 @@ export const resources = {
       },
       login: {
         title: "ပြန်လည်ကြိုဆိုပါတယ်",
-        subtitle: "Links ဝန်ဆောင်မှုအားလုံး အသုံးပြုရန် ဝင်ပါ။",
+        subtitle: "Link ဝန်ဆောင်မှုအားလုံး အသုံးပြုရန် ဝင်ပါ။",
         continueWithWorkOS: "WorkOS ဖြင့် ဆက်လုပ်ရန်",
         noteExpoGo:
           "Expo Go uses a temporary exp:// callback. Register the exact redirect URI printed in the Metro logs or use a development build for WorkOS login.",
@@ -384,7 +384,7 @@ export const resources = {
           },
           hero3: {
             title: "နေ့စဉ်လိုအပ်ချက်များကို\nလွယ်ကူစွာ",
-            subtitle: "မြို့နေထိုင်မှုအတွက် Links app တစ်ခုတည်း။",
+            subtitle: "မြို့နေထိုင်မှုအတွက် Link app တစ်ခုတည်း။",
             badge: "SMART FLOW",
           },
         },
@@ -529,7 +529,7 @@ export const resources = {
   zh: {
     translation: {
       common: {
-        appName: "Links",
+        appName: "Link",
         back: "返回",
         login: "登录",
         menu: "菜单",
@@ -571,7 +571,7 @@ export const resources = {
       },
       login: {
         title: "欢迎回来",
-        subtitle: "登录以解锁 Links 的全部服务。",
+        subtitle: "登录以解锁 Link 的全部服务。",
         continueWithWorkOS: "使用 WorkOS 继续",
         noteExpoGo:
           "Expo Go uses a temporary exp:// callback. Register the exact redirect URI printed in the Metro logs or use a development build for WorkOS login.",
@@ -601,7 +601,7 @@ export const resources = {
           },
           hero3: {
             title: "每日刚需，\n简单优雅",
-            subtitle: "一个 Links 应用，覆盖你的城市生活。",
+            subtitle: "一个 Link 应用，覆盖你的城市生活。",
             badge: "智能流程",
           },
         },
@@ -742,7 +742,7 @@ export const resources = {
   th: {
     translation: {
       common: {
-        appName: "Links",
+        appName: "Link",
         back: "ย้อนกลับ",
         login: "เข้าสู่ระบบ",
         menu: "เมนู",
@@ -784,7 +784,7 @@ export const resources = {
       },
       login: {
         title: "ยินดีต้อนรับกลับ",
-        subtitle: "เข้าสู่ระบบเพื่อใช้งานบริการทั้งหมดของ Links",
+        subtitle: "เข้าสู่ระบบเพื่อใช้งานบริการทั้งหมดของ Link",
         continueWithWorkOS: "ดำเนินการต่อด้วย WorkOS",
         noteExpoGo:
           "Expo Go uses a temporary exp:// callback. Register the exact redirect URI printed in the Metro logs or use a development build for WorkOS login.",
@@ -814,7 +814,7 @@ export const resources = {
           },
           hero3: {
             title: "สิ่งจำเป็นรายวัน\nใช้ง่ายสวยงาม",
-            subtitle: "แอป Links เดียวครบทุกไลฟ์สไตล์ในเมือง",
+            subtitle: "แอป Link เดียวครบทุกไลฟ์สไตล์ในเมือง",
             badge: "SMART FLOW",
           },
         },

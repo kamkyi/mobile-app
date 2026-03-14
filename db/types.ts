@@ -13,8 +13,13 @@ export type StoredUserProfile = {
 export type StoredProfessionalProfile = {
   userId: string;
   roles: string[];
+  genders: string[];
   nickname: string;
   dateOfBirth: string;
+  serviceLocation: string;
+  serviceLatitude?: number;
+  serviceLongitude?: number;
+  bio?: string;
   profileImageUri?: string;
   createdAt: string;
   updatedAt: string;
@@ -43,7 +48,12 @@ export type SaveFlowCycleInput = {
 export type SaveProfessionalProfileInput = {
   userId: string;
   roles: string[];
+  genders: string[];
   nickname: string;
   dateOfBirth: string;
+  serviceLocation: string;
+  serviceLatitude?: number;
+  serviceLongitude?: number;
+  bio?: string;
   profileImageUri?: string;
 };

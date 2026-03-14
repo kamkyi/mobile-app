@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Links",
+    "name": "Link",
     "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -42,7 +42,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Links to access your photo library so you can choose a professional profile image."
+          "photosPermission": "Allow Link to access your photo library so you can choose a professional profile image."
         }
       ],
       "expo-sqlite"

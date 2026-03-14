@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
 import { LinearGradient } from "expo-linear-gradient";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -20,8 +21,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
   MAX_PROFESSIONAL_ROLE_SELECTION,
+  PROFESSIONAL_GENDER_OPTIONS,
   PROFESSIONAL_ROLE_OPTIONS,
+  normalizeProfessionalGenders,
   normalizeProfessionalRoles,
+  type ProfessionalGenderKey,
 } from "@/constants/professional";
 import { useAppData } from "@/context/AppDataContext";
 import { useAuth } from "@/context/AuthContext";
@@ -68,22 +72,36 @@ export default function ProfessionalProfileScreen() {
   const params = useLocalSearchParams<{ roles?: string | string[] }>();
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
-  const { currentProfessionalProfile, saveProfessionalProfile } = useAppData();
+  const { currentProfessionalProfile, isReady, saveProfessionalProfile } =
+    useAppData();
   const { width } = useHydratedWindowDimensions();
   const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
   const [nickname, setNickname] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
+  const [serviceLocation, setServiceLocation] = useState("");
+  const [serviceLatitude, setServiceLatitude] = useState<number | undefined>();
+  const [serviceLongitude, setServiceLongitude] = useState<number | undefined>();
+  const [bio, setBio] = useState("");
+  const [selectedGenders, setSelectedGenders] = useState<ProfessionalGenderKey[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
 
   const contentWidth = Math.min(width - 28, 640);
   const rolesParam = readQueryParam(params.roles);
-  const selectedRoles = normalizeProfessionalRoles(
+  const queriedRoles = normalizeProfessionalRoles(
     rolesParam
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean),
   ).slice(0, MAX_PROFESSIONAL_ROLE_SELECTION);
+  const selectedRoles =
+    queriedRoles.length > 0
+      ? queriedRoles
+      : normalizeProfessionalRoles(currentProfessionalProfile?.roles ?? []).slice(
+          0,
+          MAX_PROFESSIONAL_ROLE_SELECTION,
+        );
 
   useEffect(() => {
     if (!currentProfessionalProfile) {
@@ -94,8 +112,23 @@ export default function ProfessionalProfileScreen() {
     setDateOfBirth(
       (currentValue) => currentValue || currentProfessionalProfile.dateOfBirth,
     );
+    setServiceLocation(
+      (currentValue) => currentValue || currentProfessionalProfile.serviceLocation || "",
+    );
+    setServiceLatitude((currentValue) =>
+      currentValue ?? currentProfessionalProfile.serviceLatitude,
+    );
+    setServiceLongitude((currentValue) =>
+      currentValue ?? currentProfessionalProfile.serviceLongitude,
+    );
     setProfileImageUri(
       (currentValue) => currentValue ?? currentProfessionalProfile.profileImageUri ?? null,
+    );
+    setBio((currentValue) => currentValue || currentProfessionalProfile.bio || "");
+    setSelectedGenders((currentValue) =>
+      currentValue.length > 0
+        ? currentValue
+        : normalizeProfessionalGenders(currentProfessionalProfile.genders ?? []),
     );
   }, [currentProfessionalProfile]);
 
@@ -103,14 +136,28 @@ export default function ProfessionalProfileScreen() {
     return <Redirect href="/login" />;
   }
 
+  if (!isReady) {
+    return (
+      <SafeAreaView edges={["bottom"]} style={styles.safeArea}>
+        <View style={styles.loadingState}>
+          <ActivityIndicator color="#2563EB" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   if (selectedRoles.length === 0) {
     return <Redirect href="/professional" />;
   }
 
   const trimmedNickname = nickname.trim();
+  const trimmedServiceLocation = serviceLocation.trim();
+  const trimmedBio = bio.trim();
   const hasValidDateOfBirth = isValidDateOfBirth(dateOfBirth);
   const nicknameError = showErrors && trimmedNickname.length === 0;
   const dateOfBirthError = showErrors && !hasValidDateOfBirth;
+  const serviceLocationError = showErrors && trimmedServiceLocation.length === 0;
+  const genderError = showErrors && selectedGenders.length === 0;
 
   const handlePickImage = async () => {
     if (Platform.OS !== "web") {
@@ -148,7 +195,12 @@ export default function ProfessionalProfileScreen() {
   const handleSave = async () => {
     setShowErrors(true);
 
-    if (trimmedNickname.length === 0 || !hasValidDateOfBirth) {
+    if (
+      trimmedNickname.length === 0 ||
+      !hasValidDateOfBirth ||
+      trimmedServiceLocation.length === 0 ||
+      selectedGenders.length === 0
+    ) {
       return;
     }
 
@@ -156,16 +208,91 @@ export default function ProfessionalProfileScreen() {
       setIsSaving(true);
       await saveProfessionalProfile({
         roles: selectedRoles,
+        genders: selectedGenders,
         nickname: trimmedNickname,
         dateOfBirth,
+        serviceLocation: trimmedServiceLocation,
+        serviceLatitude,
+        serviceLongitude,
+        bio: trimmedBio || undefined,
         profileImageUri: profileImageUri ?? undefined,
       });
-      router.replace("/");
+      router.replace("/(tabs)/profile");
     } catch (error) {
       console.warn("Failed to save professional profile", error);
       Alert.alert(t("professional.saveErrorTitle"), t("professional.saveErrorBody"));
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleGenderToggle = (gender: ProfessionalGenderKey) => {
+    setSelectedGenders((currentValue) =>
+      currentValue.includes(gender)
+        ? currentValue.filter((value) => value !== gender)
+        : [...currentValue, gender],
+    );
+  };
+
+  const handleServiceLocationChange = (value: string) => {
+    setServiceLocation(value);
+    setServiceLatitude(undefined);
+    setServiceLongitude(undefined);
+  };
+
+  const handleUseCurrentLocation = async () => {
+    try {
+      setIsLocating(true);
+      const permission = await Location.requestForegroundPermissionsAsync();
+
+      if (!permission.granted) {
+        Alert.alert(
+          t("professional.locationPermissionTitle", {
+            defaultValue: "Location access needed",
+          }),
+          t("professional.locationPermissionBody", {
+            defaultValue:
+              "Allow location access to use your current service location.",
+          }),
+        );
+        return;
+      }
+
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Highest,
+      });
+
+      const latitude = position.coords.latitude;
+      const longitude = position.coords.longitude;
+
+      setServiceLatitude(latitude);
+      setServiceLongitude(longitude);
+
+      try {
+        const places = await Location.reverseGeocodeAsync({ latitude, longitude });
+        const place = places[0];
+        const approximateLabel = [place?.district, place?.city, place?.region]
+          .filter(Boolean)
+          .join(", ");
+
+        setServiceLocation(
+          approximateLabel || `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`,
+        );
+      } catch {
+        setServiceLocation(`${latitude.toFixed(3)}, ${longitude.toFixed(3)}`);
+      }
+    } catch (error) {
+      console.warn("Failed to capture current service location", error);
+      Alert.alert(
+        t("professional.locationLookupTitle", {
+          defaultValue: "Could not get current location",
+        }),
+        t("professional.locationLookupBody", {
+          defaultValue: "Try again or type your service location manually.",
+        }),
+      );
+    } finally {
+      setIsLocating(false);
     }
   };
 
@@ -283,6 +410,48 @@ export default function ProfessionalProfileScreen() {
               <Text style={styles.errorText}>{t("professional.nicknameRequired")}</Text>
             ) : null}
 
+            <Text style={styles.fieldLabel}>
+              {t("professional.genderLabel", { defaultValue: "Genders" })}
+            </Text>
+            <View style={styles.genderGrid}>
+              {PROFESSIONAL_GENDER_OPTIONS.map((option) => {
+                const active = selectedGenders.includes(option.key);
+
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    key={option.key}
+                    onPress={() => handleGenderToggle(option.key)}
+                    style={({ pressed }) => [
+                      styles.genderButton,
+                      active
+                        ? { backgroundColor: `${option.color}16`, borderColor: option.color }
+                        : null,
+                      pressed ? styles.secondaryButtonPressed : null,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.genderButtonText,
+                        active ? { color: option.color } : null,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text style={[styles.fieldHint, genderError ? styles.errorText : null]}>
+              {genderError
+                ? t("professional.genderRequired", {
+                    defaultValue: "Select at least one gender.",
+                  })
+                : t("professional.genderHint", {
+                    defaultValue: "Choose one or more genders for your profile.",
+                  })}
+            </Text>
+
             <Text style={styles.fieldLabel}>{t("professional.dobLabel")}</Text>
             <TextInput
               accessibilityLabel={t("professional.dobLabel")}
@@ -305,6 +474,91 @@ export default function ProfessionalProfileScreen() {
               {dateOfBirthError
                 ? t("professional.dobInvalid")
                 : t("professional.dobHint")}
+            </Text>
+
+            <Text style={styles.fieldLabel}>
+              {t("professional.serviceLocationLabel", {
+                defaultValue: "Service location",
+              })}
+            </Text>
+            <TextInput
+              accessibilityLabel={t("professional.serviceLocationLabel", {
+                defaultValue: "Service location",
+              })}
+              autoCapitalize="words"
+              autoCorrect={false}
+              maxLength={90}
+              onChangeText={handleServiceLocationChange}
+              placeholder={t("professional.serviceLocationPlaceholder", {
+                defaultValue: "Enter service area, city, or district",
+              })}
+              placeholderTextColor="#94A3B8"
+              style={[
+                styles.textInput,
+                serviceLocationError ? styles.textInputError : null,
+              ]}
+              value={serviceLocation}
+            />
+            <Pressable
+              accessibilityRole="button"
+              disabled={isLocating}
+              onPress={handleUseCurrentLocation}
+              style={({ pressed }) => [
+                styles.locationButton,
+                pressed && !isLocating ? styles.secondaryButtonPressed : null,
+                isLocating ? styles.locationButtonDisabled : null,
+              ]}
+            >
+              {isLocating ? (
+                <ActivityIndicator color="#1D4ED8" />
+              ) : (
+                <>
+                  <Ionicons color="#1D4ED8" name="locate-outline" size={16} />
+                  <Text style={styles.locationButtonText}>
+                    {t("professional.useCurrentLocation", {
+                      defaultValue: "Use current location",
+                    })}
+                  </Text>
+                </>
+              )}
+            </Pressable>
+            <Text
+              style={[styles.fieldHint, serviceLocationError ? styles.errorText : null]}
+            >
+              {serviceLocationError
+                ? t("professional.serviceLocationRequired", {
+                    defaultValue: "Service location is required.",
+                  })
+                : t("professional.serviceLocationHint", {
+                    defaultValue:
+                      "Type an area manually or use your current GPS location.",
+                  })}
+            </Text>
+
+            <Text style={styles.fieldLabel}>
+              {t("professional.bioLabel", { defaultValue: "About" })}
+            </Text>
+            <TextInput
+              accessibilityLabel={t("professional.bioLabel", {
+                defaultValue: "About",
+              })}
+              autoCapitalize="sentences"
+              autoCorrect
+              maxLength={180}
+              multiline
+              onChangeText={setBio}
+              placeholder={t("professional.bioPlaceholder", {
+                defaultValue: "Write a short intro people will see in the list.",
+              })}
+              placeholderTextColor="#94A3B8"
+              style={[styles.textInput, styles.textAreaInput]}
+              textAlignVertical="top"
+              value={bio}
+            />
+            <Text style={styles.fieldHint}>
+              {t("professional.bioHint", {
+                defaultValue: "Keep it short and clear.",
+              })}
             </Text>
           </View>
         </ScrollView>
@@ -480,6 +734,44 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
   },
+  genderGrid: {
+    marginTop: 10,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  genderButton: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#D7DFEB",
+    backgroundColor: "#F8FAFC",
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
+  genderButtonText: {
+    color: "#334155",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  locationButton: {
+    marginTop: 10,
+    minHeight: 44,
+    borderRadius: 14,
+    backgroundColor: "#DBEAFE",
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  locationButtonDisabled: {
+    opacity: 0.75,
+  },
+  locationButtonText: {
+    color: "#1D4ED8",
+    fontSize: 13,
+    fontWeight: "700",
+  },
   textInput: {
     minHeight: 48,
     borderRadius: 14,
@@ -490,6 +782,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     color: "#111827",
     fontSize: 14,
+  },
+  textAreaInput: {
+    minHeight: 110,
+    paddingTop: 14,
+    paddingBottom: 14,
   },
   textInputError: {
     borderColor: "#DC2626",
@@ -506,6 +803,11 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 12,
     backgroundColor: "#F3F7FB",
+  },
+  loadingState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   saveButton: {
     minHeight: 54,

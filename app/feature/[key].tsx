@@ -24,6 +24,9 @@ import { Calendar, type DateData } from "react-native-calendars";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { FeatureIcon } from "@/components/ui/feature-icon";
+import FeatureShowcaseScreen from "@/components/screens/FeatureShowcaseScreen";
+import NearbyScreen from "@/components/screens/NearbyScreen";
+import ProfessionalDirectoryScreen from "@/components/screens/ProfessionalDirectoryScreen";
 import {
   CAR_BRANDS,
   CAR_RENTAL_ITEMS,
@@ -415,6 +418,16 @@ export default function FeatureScreen() {
   const isDateInvalid = pickupDate.length > 0 && pickupDay === null;
   const isCarRental = params.key === "car-rental";
   const isFlow = params.key === "flow";
+  const isNearby = params.key === "nearby";
+  const directoryRole =
+    params.key === "doctor" ? "doctor" : params.key === "dating" ? "dater" : null;
+  const showcaseFeature =
+    params.key === "beauty" ||
+    params.key === "fitness" ||
+    params.key === "visit" ||
+    params.key === "food"
+      ? params.key
+      : null;
   const activeLanguage = resolveAppLanguage(
     i18n.resolvedLanguage ?? i18n.language,
   );
@@ -697,6 +710,18 @@ export default function FeatureScreen() {
 
   if (shouldRedirectToLogin) {
     return <Redirect href="/login" />;
+  }
+
+  if (directoryRole) {
+    return <ProfessionalDirectoryScreen role={directoryRole} />;
+  }
+
+  if (isNearby) {
+    return <NearbyScreen />;
+  }
+
+  if (showcaseFeature) {
+    return <FeatureShowcaseScreen featureKey={showcaseFeature} />;
   }
 
   if (isCarRental) {

@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
+import { usePathname, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   Modal,
@@ -85,6 +85,18 @@ function getAuthMethodIcon(
   if (method === "MicrosoftOAuth") return "logo-microsoft";
   if (method === "GitHubOAuth") return "logo-github";
   return "log-in-outline";
+}
+
+function isRouteActive(pathname: string, route?: string) {
+  if (!route) {
+    return false;
+  }
+
+  if (route === "/(tabs)") {
+    return pathname === "/" || pathname === "/(tabs)";
+  }
+
+  return pathname === route || pathname.startsWith(`${route}/`);
 }
 
 // ─── Avatar ──────────────────────────────────────────────────────────────────
@@ -242,7 +254,6 @@ function usePalette(colorScheme: "light" | "dark"): ColorPalette {
 
 // ─── Main Drawer ──────────────────────────────────────────────────────────────
 
-const DRAWER_WIDTH_FRACTION = 0.8;
 const SPRING_CONFIG = { damping: 22, stiffness: 200, mass: 1 };
 const LANGUAGE_CODE_LABELS: Record<AppLanguage, string> = {
   en: "EN",
@@ -264,6 +275,7 @@ export default function DrawerMenu() {
   const { user, logout } = useAuth();
   const { currentProfessionalProfile } = useAppData();
   const router = useRouter();
+  const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const colorScheme = useColorScheme();
@@ -271,13 +283,13 @@ export default function DrawerMenu() {
   const palette = usePalette(colorScheme ?? "light");
   const activeLanguage = resolveAppLanguage(i18n.resolvedLanguage ?? i18n.language);
 
-  const drawerWidth = Math.min(screenWidth * DRAWER_WIDTH_FRACTION, 320);
+  const drawerWidth = screenWidth;
 
   // ─── Keep modal mounted during closing animation ───────────────────────────
   const [modalVisible, setModalVisible] = useState(false);
 
   // ─── Animation ────────────────────────────────────────────────────────────
-  const translateX = useSharedValue(-drawerWidth);
+  const translateX = useSharedValue(drawerWidth);
   const overlayOpacity = useSharedValue(0);
 
   useEffect(() => {
@@ -286,7 +298,7 @@ export default function DrawerMenu() {
       translateX.value = withSpring(0, SPRING_CONFIG);
       overlayOpacity.value = withTiming(1, { duration: 280 });
     } else {
-      translateX.value = withSpring(-drawerWidth, SPRING_CONFIG);
+      translateX.value = withSpring(drawerWidth, SPRING_CONFIG);
       overlayOpacity.value = withTiming(0, { duration: 220 }, (finished) => {
         if (finished) runOnJS(setModalVisible)(false);
       });
@@ -305,25 +317,33 @@ export default function DrawerMenu() {
   const navItems: NavItem[] = [
     {
       key: "home",
-      label: t("drawer.nav.home"),
+      label: "Home",
       icon: "home-outline",
-      route: "/",
+      route: "/(tabs)",
+    },
+    {
+      key: "timeline",
+      label: "Timeline",
+      icon: "time-outline",
+      route: "/(tabs)/timeline",
     },
     {
       key: "explore",
-      label: t("drawer.nav.explore"),
-      icon: "compass-outline",
+      label: "Explore",
+      icon: "newspaper-outline",
       route: "/(tabs)/explore",
     },
     {
-      key: "settings",
-      label: t("drawer.nav.settings"),
-      icon: "settings-outline",
+      key: "linked",
+      label: "Linked",
+      icon: "people-outline",
+      route: "/(tabs)/linked",
     },
     {
-      key: "notifications",
-      label: t("drawer.nav.notifications"),
-      icon: "notifications-outline",
+      key: "profile",
+      label: "Profile",
+      icon: "person-outline",
+      route: "/(tabs)/profile",
     },
   ];
 
@@ -356,7 +376,10 @@ export default function DrawerMenu() {
 
   const handleProfessionalPress = () => {
     close();
-    setTimeout(() => router.push("/professional"), 250);
+    const route = hasProfessionalProfile
+      ? `/professional/profile?roles=${professionalRoles.join(",")}`
+      : "/professional";
+    setTimeout(() => router.push(route as never), 250);
   };
 
   if (!modalVisible) return null;
@@ -631,7 +654,7 @@ export default function DrawerMenu() {
                 key={item.key}
                 item={item}
                 onPress={() => handleNavPress(item)}
-                active={false}
+                active={isRouteActive(pathname, item.route)}
                 palette={palette}
               />
             ))}
@@ -684,11 +707,11 @@ const styles = StyleSheet.create({
   panel: {
     position: "absolute",
     top: 0,
-    left: 0,
+    right: 0,
     bottom: 0,
     zIndex: 2,
     shadowColor: "#000",
-    shadowOffset: { width: 4, height: 0 },
+    shadowOffset: { width: -4, height: 0 },
     shadowOpacity: 0.3,
     shadowRadius: 20,
     elevation: 24,

@@ -12,6 +12,12 @@ export type ProfessionalRoleOption = {
   descriptionKey: string;
 };
 
+export type ProfessionalGenderOption = {
+  key: string;
+  label: string;
+  color: string;
+};
+
 export const PROFESSIONAL_ROLE_OPTIONS = [
   {
     key: "doctor",
@@ -101,8 +107,32 @@ export const PROFESSIONAL_ROLE_OPTIONS = [
 
 export type ProfessionalRoleKey = (typeof PROFESSIONAL_ROLE_OPTIONS)[number]["key"];
 
+export const PROFESSIONAL_GENDER_OPTIONS = [
+  {
+    key: "male",
+    label: "Male",
+    color: "#2563EB",
+  },
+  {
+    key: "female",
+    label: "Female",
+    color: "#DB2777",
+  },
+  {
+    key: "lgbt",
+    label: "LGBT",
+    color: "#059669",
+  },
+] as const satisfies readonly ProfessionalGenderOption[];
+
+export type ProfessionalGenderKey =
+  (typeof PROFESSIONAL_GENDER_OPTIONS)[number]["key"];
+
 const ROLE_KEYS = new Set<string>(
   PROFESSIONAL_ROLE_OPTIONS.map((option) => option.key),
+);
+const GENDER_KEYS = new Set<string>(
+  PROFESSIONAL_GENDER_OPTIONS.map((option) => option.key),
 );
 
 export function isProfessionalRoleKey(value: string): value is ProfessionalRoleKey {
@@ -116,6 +146,28 @@ export function normalizeProfessionalRoles(
 
   return values.reduce<ProfessionalRoleKey[]>((result, value) => {
     if (!isProfessionalRoleKey(value) || seen.has(value)) {
+      return result;
+    }
+
+    seen.add(value);
+    result.push(value);
+    return result;
+  }, []);
+}
+
+export function isProfessionalGenderKey(
+  value: string,
+): value is ProfessionalGenderKey {
+  return GENDER_KEYS.has(value);
+}
+
+export function normalizeProfessionalGenders(
+  values: readonly string[],
+): ProfessionalGenderKey[] {
+  const seen = new Set<ProfessionalGenderKey>();
+
+  return values.reduce<ProfessionalGenderKey[]>((result, value) => {
+    if (!isProfessionalGenderKey(value) || seen.has(value)) {
       return result;
     }
 

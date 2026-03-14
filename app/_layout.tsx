@@ -117,7 +117,7 @@ export default function RootLayout() {
               }}
             >
               <Stack.Screen
-                name="index"
+                name="(tabs)"
                 options={{
                   headerTitle: HeaderBrand,
                   headerTitleAlign: "left",
@@ -125,6 +125,7 @@ export default function RootLayout() {
                   headerRight: HeaderActionButton,
                 }}
               />
+              <Stack.Screen name="index" options={{ headerShown: false }} />
               <Stack.Screen name="login" options={{ title: t("common.login") }} />
               <Stack.Screen
                 name="feature/[key]"

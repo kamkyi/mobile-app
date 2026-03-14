@@ -28,12 +28,32 @@ function sanitizeState(value: unknown): PersistedState {
   }
 
   const parsed = value as Partial<PersistedState>;
+  const professionalProfiles = Array.isArray(parsed.professionalProfiles)
+    ? parsed.professionalProfiles.map((item) => ({
+        ...item,
+        bio: typeof item?.bio === "string" ? item.bio : undefined,
+        serviceLatitude:
+          typeof item?.serviceLatitude === "number"
+            ? item.serviceLatitude
+            : undefined,
+        serviceLongitude:
+          typeof item?.serviceLongitude === "number"
+            ? item.serviceLongitude
+            : undefined,
+        serviceLocation:
+          typeof item?.serviceLocation === "string" ? item.serviceLocation : "",
+        genders: Array.isArray(item?.genders)
+          ? item.genders.filter((gender) => typeof gender === "string")
+          : [],
+        roles: Array.isArray(item?.roles)
+          ? item.roles.filter((role) => typeof role === "string")
+          : [],
+      }))
+    : [];
 
   return {
     flowCycles: Array.isArray(parsed.flowCycles) ? parsed.flowCycles : [],
-    professionalProfiles: Array.isArray(parsed.professionalProfiles)
-      ? parsed.professionalProfiles
-      : [],
+    professionalProfiles,
     userProfiles: Array.isArray(parsed.userProfiles) ? parsed.userProfiles : [],
   };
 }
@@ -133,9 +153,21 @@ export async function getUserProfile(userId: string) {
   return state.userProfiles.find((item) => item.userId === userId) ?? null;
 }
 
+export async function listUserProfiles() {
+  ensureInitialized();
+  return [...state.userProfiles].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
 export async function getProfessionalProfile(userId: string) {
   ensureInitialized();
   return state.professionalProfiles.find((item) => item.userId === userId) ?? null;
+}
+
+export async function listProfessionalProfiles() {
+  ensureInitialized();
+  return [...state.professionalProfiles].sort((a, b) =>
+    b.updatedAt.localeCompare(a.updatedAt),
+  );
 }
 
 export async function saveProfessionalProfile(input: SaveProfessionalProfileInput) {
@@ -151,8 +183,13 @@ export async function saveProfessionalProfile(input: SaveProfessionalProfileInpu
   const nextProfile: StoredProfessionalProfile = {
     userId: input.userId,
     roles: [...input.roles],
+    genders: [...input.genders],
     nickname: input.nickname,
     dateOfBirth: input.dateOfBirth,
+    serviceLocation: input.serviceLocation,
+    serviceLatitude: input.serviceLatitude,
+    serviceLongitude: input.serviceLongitude,
+    bio: input.bio,
     profileImageUri: input.profileImageUri,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
