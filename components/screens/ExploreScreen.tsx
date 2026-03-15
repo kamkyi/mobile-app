@@ -11,11 +11,16 @@ import {
   EXPLORE_WEATHER_CARDS,
   type ExploreCategoryKey,
 } from "@/constants/explore-feed";
+import { useScreenLayout } from "@/hooks/use-screen-layout";
 
 type ExploreFilter = "all" | ExploreCategoryKey;
 
 export default function ExploreScreen() {
   const [selectedFilter, setSelectedFilter] = useState<ExploreFilter>("all");
+  const { contentContainerStyle } = useScreenLayout({
+    bottomPadding: 32,
+    gap: 18,
+  });
 
   const stories = useMemo(() => {
     if (selectedFilter === "all") {
@@ -30,7 +35,7 @@ export default function ExploreScreen() {
       <Stack.Screen options={{ title: "Explore" }} />
 
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={contentContainerStyle}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.heroCard}>
@@ -153,11 +158,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "#F8FAFC",
-  },
-  content: {
-    padding: 16,
-    paddingBottom: 32,
-    gap: 18,
   },
   heroCard: {
     borderRadius: 24,

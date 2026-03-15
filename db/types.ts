@@ -10,6 +10,20 @@ export type StoredUserProfile = {
   updatedAt: string;
 };
 
+export type ProfessionalRoleImageCollection = {
+  role: string;
+  imageUris: string[];
+};
+
+export type ProfessionalShopProduct = {
+  id: string;
+  title: string;
+  description?: string;
+  price: number;
+  imageUris: string[];
+  createdAt: string;
+};
+
 export type StoredProfessionalProfile = {
   userId: string;
   roles: string[];
@@ -21,6 +35,9 @@ export type StoredProfessionalProfile = {
   serviceLongitude?: number;
   bio?: string;
   profileImageUri?: string;
+  walletCoins: number;
+  roleImageCollections: ProfessionalRoleImageCollection[];
+  shopProducts: ProfessionalShopProduct[];
   createdAt: string;
   updatedAt: string;
 };
@@ -56,4 +73,7 @@ export type SaveProfessionalProfileInput = {
   serviceLongitude?: number;
   bio?: string;
   profileImageUri?: string;
+  walletCoins?: number;
+  roleImageCollections?: ProfessionalRoleImageCollection[];
+  shopProducts?: ProfessionalShopProduct[];
 };

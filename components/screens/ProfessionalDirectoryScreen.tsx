@@ -26,6 +26,7 @@ import type {
   StoredProfessionalProfile,
   StoredUserProfile,
 } from "@/db/types";
+import { useScreenLayout } from "@/hooks/use-screen-layout";
 
 type DirectoryRole = Extract<ProfessionalRoleKey, "doctor" | "dater">;
 type GenderFilter = "all" | ProfessionalGenderKey;
@@ -197,6 +198,10 @@ export default function ProfessionalDirectoryScreen({
 }: {
   role: DirectoryRole;
 }) {
+  const { contentContainerStyle } = useScreenLayout({
+    bottomPadding: 28,
+    gap: 14,
+  });
   const [entries, setEntries] = useState<DirectoryEntry[]>([]);
   const [selectedGender, setSelectedGender] = useState<GenderFilter>("all");
   const [isLoading, setIsLoading] = useState(true);
@@ -248,7 +253,7 @@ export default function ProfessionalDirectoryScreen({
       <Stack.Screen options={{ title: getRoleTitle(role) }} />
 
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, contentContainerStyle]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerCard}>
@@ -335,8 +340,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#F8FAFC",
   },
   scrollContent: {
-    padding: 16,
-    paddingBottom: 28,
     gap: 14,
   },
   headerCard: {

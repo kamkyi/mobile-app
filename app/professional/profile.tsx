@@ -32,7 +32,7 @@ import {
 } from "@/constants/professional";
 import { useAppData } from "@/context/AppDataContext";
 import { useAuth } from "@/context/AuthContext";
-import { useHydratedWindowDimensions } from "@/hooks/use-hydrated-window-dimensions";
+import { useScreenLayout } from "@/hooks/use-screen-layout";
 
 function readQueryParam(value?: string | string[]): string {
   if (Array.isArray(value)) {
@@ -104,7 +104,12 @@ export default function ProfessionalProfileScreen() {
   const { isAuthenticated } = useAuth();
   const { currentProfessionalProfile, isReady, saveProfessionalProfile } =
     useAppData();
-  const { width } = useHydratedWindowDimensions();
+  const { contentContainerStyle } = useScreenLayout({
+    bottomPadding: 24,
+    maxWidth: 640,
+    minHorizontalPadding: 14,
+    topPadding: 16,
+  });
   const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
   const [nickname, setNickname] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
@@ -118,7 +123,6 @@ export default function ProfessionalProfileScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
 
-  const contentWidth = Math.min(width - 28, 640);
   const rolesParam = readQueryParam(params.roles);
   const queriedRoles = normalizeProfessionalRoles(
     rolesParam
@@ -348,10 +352,7 @@ export default function ProfessionalProfileScreen() {
       <View style={styles.container}>
         <ScrollView
           bounces={false}
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingHorizontal: Math.max(14, (width - contentWidth) / 2) },
-          ]}
+          contentContainerStyle={contentContainerStyle}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -678,10 +679,6 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-  },
-  scrollContent: {
-    paddingTop: 16,
-    paddingBottom: 24,
   },
   heroCard: {
     borderRadius: 24,

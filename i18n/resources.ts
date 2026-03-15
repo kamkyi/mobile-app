@@ -295,6 +295,10 @@ export const resources = {
             title: "Driver",
             description: "Private rides, transfers, and trusted transport support.",
           },
+          "shop-owner": {
+            title: "Shop Owner",
+            description: "Sell products, manage shop photos, and present your business.",
+          },
           electrician: {
             title: "Electrician",
             description: "Electrical fixes, wiring checks, and home service visits.",

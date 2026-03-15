@@ -16,6 +16,7 @@ import {
   NEARBY_SERVICES,
   type NearbyService,
 } from "@/constants/nearby-services";
+import { useScreenLayout } from "@/hooks/use-screen-layout";
 
 type PermissionState = "loading" | "granted" | "denied";
 
@@ -68,6 +69,10 @@ function NearbyCard({
 
 export default function NearbyScreen() {
   const router = useRouter();
+  const { contentContainerStyle } = useScreenLayout({
+    bottomPadding: 28,
+    gap: 14,
+  });
   const [permissionState, setPermissionState] = useState<PermissionState>("loading");
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(
@@ -122,7 +127,7 @@ export default function NearbyScreen() {
       <Stack.Screen options={{ title: "Nearby" }} />
 
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={contentContainerStyle}
         showsVerticalScrollIndicator={false}
       >
         {permissionState === "loading" ? (
@@ -193,11 +198,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "#F8FAFC",
-  },
-  content: {
-    padding: 16,
-    paddingBottom: 28,
-    gap: 14,
   },
   stateCard: {
     borderRadius: 22,

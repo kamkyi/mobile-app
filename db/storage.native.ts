@@ -1,6 +1,13 @@
 import { openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
 
+import {
+  DEFAULT_ELECTRONICS_COINS,
+  MAX_ROLE_GALLERY_IMAGES,
+  MAX_SHOP_PRODUCT_IMAGES,
+} from "@/constants/profile-mode";
 import type {
+  ProfessionalRoleImageCollection,
+  ProfessionalShopProduct,
   SaveProfessionalProfileInput,
   SaveFlowCycleInput,
   StoredProfessionalProfile,
@@ -9,7 +16,7 @@ import type {
 } from "@/db/types";
 
 const DATABASE_NAME = "links.db";
-const DATABASE_VERSION = 4;
+const DATABASE_VERSION = 5;
 
 type FlowCycleRow = {
   id: string;
@@ -45,6 +52,9 @@ type ProfessionalProfileRow = {
   service_longitude: number | null;
   bio: string | null;
   profile_image_uri: string | null;
+  wallet_coins: number | null;
+  role_image_collections_json: string | null;
+  shop_products_json: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -75,6 +85,9 @@ const CREATE_PROFESSIONAL_PROFILES_TABLE = `
     service_longitude REAL,
     bio TEXT,
     profile_image_uri TEXT,
+    wallet_coins INTEGER NOT NULL DEFAULT 1280,
+    role_image_collections_json TEXT NOT NULL DEFAULT '[]',
+    shop_products_json TEXT NOT NULL DEFAULT '[]',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
@@ -125,6 +138,104 @@ function mapUserProfileRow(row: UserProfileRow): StoredUserProfile {
   };
 }
 
+function sanitizeWalletCoins(value: unknown) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return DEFAULT_ELECTRONICS_COINS;
+  }
+
+  return Math.round(value);
+}
+
+function sanitizeImageUris(value: unknown, limit: number) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((item): item is string => typeof item === "string").slice(0, limit);
+}
+
+function parseRoleImageCollectionsJson(
+  value: string | null,
+): ProfessionalRoleImageCollection[] {
+  if (!value) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .map((item) => {
+        if (!item || typeof item !== "object") {
+          return null;
+        }
+
+        const role = typeof item.role === "string" ? item.role : "";
+        if (!role) {
+          return null;
+        }
+
+        return {
+          role,
+          imageUris: sanitizeImageUris(item.imageUris, MAX_ROLE_GALLERY_IMAGES),
+        };
+      })
+      .filter((item): item is ProfessionalRoleImageCollection => Boolean(item));
+  } catch {
+    return [];
+  }
+}
+
+function parseShopProductsJson(value: string | null): ProfessionalShopProduct[] {
+  if (!value) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.reduce<ProfessionalShopProduct[]>((result, item) => {
+        if (!item || typeof item !== "object") {
+          return result;
+        }
+
+        const id = typeof item.id === "string" ? item.id : "";
+        const title = typeof item.title === "string" ? item.title : "";
+
+        if (!id || !title) {
+          return result;
+        }
+
+        result.push({
+          id,
+          title,
+          description: typeof item.description === "string" ? item.description : undefined,
+          price:
+            typeof item.price === "number" && Number.isFinite(item.price)
+              ? item.price
+              : 0,
+          imageUris: sanitizeImageUris(item.imageUris, MAX_SHOP_PRODUCT_IMAGES),
+          createdAt:
+            typeof item.createdAt === "string"
+              ? item.createdAt
+              : new Date().toISOString(),
+        });
+
+        return result;
+      }, []);
+  } catch {
+    return [];
+  }
+}
+
 function mapProfessionalProfileRow(
   row: ProfessionalProfileRow,
 ): StoredProfessionalProfile {
@@ -158,6 +269,11 @@ function mapProfessionalProfileRow(
     serviceLongitude: row.service_longitude ?? undefined,
     bio: row.bio ?? undefined,
     profileImageUri: row.profile_image_uri ?? undefined,
+    walletCoins: sanitizeWalletCoins(row.wallet_coins),
+    roleImageCollections: parseRoleImageCollectionsJson(
+      row.role_image_collections_json,
+    ),
+    shopProducts: parseShopProductsJson(row.shop_products_json),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -214,6 +330,24 @@ async function ensureProfessionalProfileSchema(db: SQLiteDatabase) {
   if (!columnNames.has("service_longitude")) {
     await db.execAsync(
       "ALTER TABLE professional_profiles ADD COLUMN service_longitude REAL;",
+    );
+  }
+
+  if (!columnNames.has("wallet_coins")) {
+    await db.execAsync(
+      `ALTER TABLE professional_profiles ADD COLUMN wallet_coins INTEGER NOT NULL DEFAULT ${DEFAULT_ELECTRONICS_COINS};`,
+    );
+  }
+
+  if (!columnNames.has("role_image_collections_json")) {
+    await db.execAsync(
+      "ALTER TABLE professional_profiles ADD COLUMN role_image_collections_json TEXT NOT NULL DEFAULT '[]';",
+    );
+  }
+
+  if (!columnNames.has("shop_products_json")) {
+    await db.execAsync(
+      "ALTER TABLE professional_profiles ADD COLUMN shop_products_json TEXT NOT NULL DEFAULT '[]';",
     );
   }
 }
@@ -396,6 +530,9 @@ export async function getProfessionalProfile(userId: string) {
         service_longitude,
         bio,
         profile_image_uri,
+        wallet_coins,
+        role_image_collections_json,
+        shop_products_json,
         created_at,
         updated_at
       FROM professional_profiles
@@ -423,6 +560,9 @@ export async function listProfessionalProfiles() {
         service_longitude,
         bio,
         profile_image_uri,
+        wallet_coins,
+        role_image_collections_json,
+        shop_products_json,
         created_at,
         updated_at
       FROM professional_profiles
@@ -436,13 +576,36 @@ export async function listProfessionalProfiles() {
 export async function saveProfessionalProfile(input: SaveProfessionalProfileInput) {
   const db = await getDatabase();
   const now = new Date().toISOString();
-  const existing = await db.getFirstAsync<{ created_at: string }>(
-    "SELECT created_at FROM professional_profiles WHERE user_id = ?",
+  const existing = await db.getFirstAsync<{
+    created_at: string;
+    role_image_collections_json: string | null;
+    shop_products_json: string | null;
+    wallet_coins: number | null;
+  }>(
+    `
+      SELECT
+        created_at,
+        wallet_coins,
+        role_image_collections_json,
+        shop_products_json
+      FROM professional_profiles
+      WHERE user_id = ?
+    `,
     input.userId,
   );
   const createdAt = existing?.created_at ?? now;
   const rolesJson = JSON.stringify(input.roles);
   const gendersJson = JSON.stringify(input.genders);
+  const walletCoins = sanitizeWalletCoins(
+    input.walletCoins ?? existing?.wallet_coins,
+  );
+  const roleImageCollectionsJson = JSON.stringify(
+    input.roleImageCollections ??
+      parseRoleImageCollectionsJson(existing?.role_image_collections_json ?? null),
+  );
+  const shopProductsJson = JSON.stringify(
+    input.shopProducts ?? parseShopProductsJson(existing?.shop_products_json ?? null),
+  );
 
   await db.runAsync(
     `
@@ -457,9 +620,12 @@ export async function saveProfessionalProfile(input: SaveProfessionalProfileInpu
         service_longitude,
         bio,
         profile_image_uri,
+        wallet_coins,
+        role_image_collections_json,
+        shop_products_json,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(user_id) DO UPDATE SET
         roles_json = excluded.roles_json,
         genders_json = excluded.genders_json,
@@ -470,6 +636,9 @@ export async function saveProfessionalProfile(input: SaveProfessionalProfileInpu
         service_longitude = excluded.service_longitude,
         bio = excluded.bio,
         profile_image_uri = excluded.profile_image_uri,
+        wallet_coins = excluded.wallet_coins,
+        role_image_collections_json = excluded.role_image_collections_json,
+        shop_products_json = excluded.shop_products_json,
         updated_at = excluded.updated_at
     `,
     input.userId,
@@ -482,6 +651,9 @@ export async function saveProfessionalProfile(input: SaveProfessionalProfileInpu
     input.serviceLongitude ?? null,
     input.bio ?? null,
     input.profileImageUri ?? null,
+    walletCoins,
+    roleImageCollectionsJson,
+    shopProductsJson,
     createdAt,
     now,
   );
@@ -497,6 +669,9 @@ export async function saveProfessionalProfile(input: SaveProfessionalProfileInpu
     serviceLongitude: input.serviceLongitude,
     bio: input.bio,
     profileImageUri: input.profileImageUri,
+    walletCoins,
+    roleImageCollections: parseRoleImageCollectionsJson(roleImageCollectionsJson),
+    shopProducts: parseShopProductsJson(shopProductsJson),
     createdAt,
     updatedAt: now,
   };

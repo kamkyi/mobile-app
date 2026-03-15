@@ -10,6 +10,7 @@ import {
   normalizeProfessionalRoles,
 } from "@/constants/professional";
 import { useAppData } from "@/context/AppDataContext";
+import { useScreenLayout } from "@/hooks/use-screen-layout";
 
 function getRoleLabel(role: string) {
   const option = PROFESSIONAL_ROLE_OPTIONS.find((item) => item.key === role);
@@ -27,13 +28,17 @@ function getRoleLabel(role: string) {
 export default function LinkedTabScreen() {
   const router = useRouter();
   const { currentProfessionalProfile } = useAppData();
+  const { contentContainerStyle } = useScreenLayout({
+    bottomPadding: 32,
+    gap: 14,
+  });
   const roles = normalizeProfessionalRoles(currentProfessionalProfile?.roles ?? []);
   const genders = normalizeProfessionalGenders(currentProfessionalProfile?.genders ?? []);
 
   return (
     <SafeAreaView edges={["bottom"]} style={styles.safeArea}>
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={contentContainerStyle}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerCard}>
@@ -101,10 +106,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "#F8FAFC",
-  },
-  content: {
-    padding: 16,
-    gap: 14,
   },
   headerCard: {
     borderRadius: 22,

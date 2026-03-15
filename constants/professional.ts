@@ -97,6 +97,13 @@ export const PROFESSIONAL_ROLE_OPTIONS = [
     descriptionKey: "professional.roles.driver.description",
   },
   {
+    key: "shop-owner",
+    iconName: "storefront-outline",
+    color: "#F59E0B",
+    titleKey: "professional.roles.shop-owner.title",
+    descriptionKey: "professional.roles.shop-owner.description",
+  },
+  {
     key: "electrician",
     iconName: "flash-outline",
     color: "#06B6D4",

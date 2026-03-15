@@ -8,6 +8,7 @@ import {
   SHOWCASE_SECTIONS,
   type ShowcaseFeatureKey,
 } from "@/constants/feature-showcase";
+import { useScreenLayout } from "@/hooks/use-screen-layout";
 
 export default function FeatureShowcaseScreen({
   featureKey,
@@ -16,13 +17,17 @@ export default function FeatureShowcaseScreen({
 }) {
   const section = SHOWCASE_SECTIONS[featureKey];
   const isProfessionalList = featureKey === "beauty" || featureKey === "fitness";
+  const { contentContainerStyle } = useScreenLayout({
+    bottomPadding: 32,
+    gap: 16,
+  });
 
   return (
     <SafeAreaView edges={["bottom"]} style={styles.safeArea}>
       <Stack.Screen options={{ title: section.title }} />
 
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={contentContainerStyle}
         showsVerticalScrollIndicator={false}
       >
         <View style={[styles.heroCard, { borderColor: `${section.accentColor}32` }]}>
@@ -111,11 +116,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "#F8FAFC",
-  },
-  content: {
-    padding: 16,
-    paddingBottom: 32,
-    gap: 16,
   },
   heroCard: {
     borderRadius: 24,

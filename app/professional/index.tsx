@@ -20,7 +20,7 @@ import {
 } from "@/constants/professional";
 import { useAppData } from "@/context/AppDataContext";
 import { useAuth } from "@/context/AuthContext";
-import { useHydratedWindowDimensions } from "@/hooks/use-hydrated-window-dimensions";
+import { useScreenLayout } from "@/hooks/use-screen-layout";
 
 function getRoleColumns(width: number): number {
   if (width >= 900) return 3;
@@ -32,13 +32,17 @@ export default function ProfessionalRoleScreen() {
   const { t } = useTranslation();
   const { isAuthenticated } = useAuth();
   const { currentProfessionalProfile, isReady } = useAppData();
-  const { width } = useHydratedWindowDimensions();
   const [selectedRoles, setSelectedRoles] = useState<ProfessionalRoleKey[]>([]);
   const [isLimitReached, setIsLimitReached] = useState(false);
   const [hasInitializedSelection, setHasInitializedSelection] = useState(false);
+  const { contentContainerStyle, contentWidth, width } = useScreenLayout({
+    bottomPadding: 24,
+    maxWidth: 680,
+    minHorizontalPadding: 14,
+    topPadding: 16,
+  });
 
   const columns = getRoleColumns(width);
-  const contentWidth = Math.min(width - 28, 680);
   const cardGap = 12;
   const cardWidth = (contentWidth - cardGap * (columns - 1)) / columns;
   const storedRoles = normalizeProfessionalRoles(
@@ -88,10 +92,7 @@ export default function ProfessionalRoleScreen() {
       <View style={styles.container}>
         <ScrollView
           bounces={false}
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingHorizontal: Math.max(14, (width - contentWidth) / 2) },
-          ]}
+          contentContainerStyle={contentContainerStyle}
           showsVerticalScrollIndicator={false}
         >
           <LinearGradient
@@ -207,10 +208,6 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-  },
-  scrollContent: {
-    paddingTop: 16,
-    paddingBottom: 24,
   },
   heroCard: {
     borderRadius: 24,

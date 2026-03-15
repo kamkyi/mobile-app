@@ -15,17 +15,21 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
 import { useHydratedWindowDimensions } from "@/hooks/use-hydrated-window-dimensions";
+import { useScreenLayout } from "@/hooks/use-screen-layout";
 
 export default function LoginScreen() {
-  const { width } = useHydratedWindowDimensions();
   const insets = useSafeAreaInsets();
   const { isAuthenticated, isLoading, startWorkOSLogin } = useAuth();
   const { t } = useTranslation();
+  const { width } = useHydratedWindowDimensions();
+  const { contentWidth, horizontalPadding } = useScreenLayout({
+    maxWidth: 420,
+    minHorizontalPadding: width < 380 ? 12 : 16,
+  });
   const isExpoGoNativeRuntime =
     Platform.OS !== "web" &&
     Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
-  const horizontalPadding = width < 380 ? 12 : 16;
-  const cardWidth = Math.min(width - horizontalPadding * 2, 380);
+  const cardWidth = Math.min(contentWidth, 380);
 
   if (isAuthenticated) {
     return <Redirect href="/" />;

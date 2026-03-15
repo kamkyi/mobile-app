@@ -3,6 +3,8 @@ import { useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useScreenLayout } from "@/hooks/use-screen-layout";
+
 const TIMELINE_CARDS = [
   {
     key: "doctor",
@@ -29,11 +31,15 @@ const TIMELINE_CARDS = [
 
 export default function TimelineTabScreen() {
   const router = useRouter();
+  const { contentContainerStyle } = useScreenLayout({
+    bottomPadding: 32,
+    gap: 14,
+  });
 
   return (
     <SafeAreaView edges={["bottom"]} style={styles.safeArea}>
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={contentContainerStyle}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerCard}>
@@ -71,10 +77,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "#F8FAFC",
-  },
-  content: {
-    padding: 16,
-    gap: 14,
   },
   headerCard: {
     borderRadius: 22,

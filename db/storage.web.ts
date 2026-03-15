@@ -1,4 +1,11 @@
+import {
+  DEFAULT_ELECTRONICS_COINS,
+  MAX_ROLE_GALLERY_IMAGES,
+  MAX_SHOP_PRODUCT_IMAGES,
+} from "@/constants/profile-mode";
 import type {
+  ProfessionalRoleImageCollection,
+  ProfessionalShopProduct,
   SaveProfessionalProfileInput,
   SaveFlowCycleInput,
   StoredProfessionalProfile,
@@ -20,6 +27,84 @@ function createEmptyState(): PersistedState {
     professionalProfiles: [],
     userProfiles: [],
   };
+}
+
+function sanitizeWalletCoins(value: unknown) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return DEFAULT_ELECTRONICS_COINS;
+  }
+
+  return Math.round(value);
+}
+
+function sanitizeImageUris(value: unknown, limit: number) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((item): item is string => typeof item === "string").slice(0, limit);
+}
+
+function sanitizeRoleImageCollections(
+  value: unknown,
+): ProfessionalRoleImageCollection[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const role = typeof item.role === "string" ? item.role : "";
+      if (!role) {
+        return null;
+      }
+
+      return {
+        role,
+        imageUris: sanitizeImageUris(item.imageUris, MAX_ROLE_GALLERY_IMAGES),
+      };
+    })
+    .filter((item): item is ProfessionalRoleImageCollection => Boolean(item));
+}
+
+function sanitizeShopProducts(value: unknown): ProfessionalShopProduct[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.reduce<ProfessionalShopProduct[]>((result, item) => {
+      if (!item || typeof item !== "object") {
+        return result;
+      }
+
+      const id = typeof item.id === "string" ? item.id : "";
+      const title = typeof item.title === "string" ? item.title : "";
+
+      if (!id || !title) {
+        return result;
+      }
+
+      result.push({
+        id,
+        title,
+        description: typeof item.description === "string" ? item.description : undefined,
+        price:
+          typeof item.price === "number" && Number.isFinite(item.price)
+            ? item.price
+            : 0,
+        imageUris: sanitizeImageUris(item.imageUris, MAX_SHOP_PRODUCT_IMAGES),
+        createdAt:
+          typeof item.createdAt === "string"
+            ? item.createdAt
+            : new Date().toISOString(),
+      });
+
+      return result;
+    }, []);
 }
 
 function sanitizeState(value: unknown): PersistedState {
@@ -45,6 +130,9 @@ function sanitizeState(value: unknown): PersistedState {
         genders: Array.isArray(item?.genders)
           ? item.genders.filter((gender) => typeof gender === "string")
           : [],
+        walletCoins: sanitizeWalletCoins(item?.walletCoins),
+        roleImageCollections: sanitizeRoleImageCollections(item?.roleImageCollections),
+        shopProducts: sanitizeShopProducts(item?.shopProducts),
         roles: Array.isArray(item?.roles)
           ? item.roles.filter((role) => typeof role === "string")
           : [],
@@ -191,6 +279,13 @@ export async function saveProfessionalProfile(input: SaveProfessionalProfileInpu
     serviceLongitude: input.serviceLongitude,
     bio: input.bio,
     profileImageUri: input.profileImageUri,
+    walletCoins: input.walletCoins ?? existing?.walletCoins ?? DEFAULT_ELECTRONICS_COINS,
+    roleImageCollections: sanitizeRoleImageCollections(
+      input.roleImageCollections ?? existing?.roleImageCollections ?? [],
+    ),
+    shopProducts: sanitizeShopProducts(
+      input.shopProducts ?? existing?.shopProducts ?? [],
+    ),
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
